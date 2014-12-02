@@ -54,6 +54,12 @@
     <Compile Include="DataAttributes\DataSourceAttribute.cs" />
     <Compile Include="DataAttributes\DbColumnAttribute.cs" />
     <Compile Include="DataAttributes\IsIDFieldAttribute.cs" />
+    <Compile Include="DataMappers\DepartmentsDataMapper.cs" />
+    <Compile Include="DataMappers\SitesDataMapper.cs" />
+    <Compile Include="DataMappers\SitesDepartmentsDataMapper.cs" />
+    <Compile Include="DataModels\Department.cs" />
+    <Compile Include="DataModels\Site.cs" />
+    <Compile Include="DataModels\SiteDepartment.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Exceptions\NoDataSourceNameException.cs" />
     <Compile Include="Exceptions\NoTableFieldsException.cs" />
@@ -65,9 +71,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Repository\DataStorage.cs" />
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
-    <Folder Include="DataMappers\" />
-    <Folder Include="DataModels\" />
+    <None Include="ORM.dll.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

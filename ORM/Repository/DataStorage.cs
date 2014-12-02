@@ -7,18 +7,24 @@ using System.Threading;
 
 using ORM.Helpers;
 using ORM.DataAccess;
+using ORM.DataMappers;
 //using ORM.DataModels;
 //using ORM.DataMappers;
 
 
-namespace LyncBillingBase.Repository
+namespace ORM.Repository
 {
     public sealed class DataStorage
     {
         /***
          * DataStorage Repositories
          */
-       
+
+        /*Example of Instantiating DataMappers inside DB Storage*/
+        public SitesDepartmentsDataMapper Sites = new SitesDepartmentsDataMapper();
+        public DepartmentsDataMapper Departments = new DepartmentsDataMapper();
+        public SitesDepartmentsDataMapper SitesDepartments = new SitesDepartmentsDataMapper();
+
 
         /***
          * Singleton implementation with an attempted thread-safety using double-check locking
