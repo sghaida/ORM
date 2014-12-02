@@ -1,0 +1,5 @@
+c:\users\sghaida\documents\visual studio 2013\Projects\ORM\ORM\obj\Debug\ORM.csprojResolveAssemblyReference.cache
+c:\users\sghaida\documents\visual studio 2013\Projects\ORM\ORM\bin\Debug\ORM.dll
+c:\users\sghaida\documents\visual studio 2013\Projects\ORM\ORM\bin\Debug\ORM.pdb
+c:\users\sghaida\documents\visual studio 2013\Projects\ORM\ORM\obj\Debug\ORM.dll
+c:\users\sghaida\documents\visual studio 2013\Projects\ORM\ORM\obj\Debug\ORM.pdb
