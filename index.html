@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Orm by Software-Repos</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Orm</h1>
+        <h2>Object Relation mapping Implementation</h2>
+        <a href="https://github.com/Software-Repos/ORM" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h1>
+
+<p>This article intends to describe the way of writing Object Relation Mapping in .Net framework, for those who doesn’t know anything about it. Object Relation Mapping is away to map your relational database to logical objects in the Programming language which comes to an advantage to reduce the lines of code to implement a business process and provides some sort of persistency to the objects. There is a lot of ORM implementations in the market, but why not doing it yourself to fit your needs instead of using out of the box software, with extra things that you don’t need which comes with a cost of memory foot print and performance. So I was experimenting with ORM and I created my own but it misses one thing “objects persistency”, which I will implement it at a later stage and I will post it once I’m done. 
+Background
+How can we present the database tables, and table’s relations in a way that it is presentable for Application Objects, or how can we map the Logical objects to Database tables in way by creating a logical view for the database represented in Application objects. Will ORM is all about that. </p>
+
+<h1>
+<a id="using-the-code" class="anchor" href="#using-the-code" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using the code</h1>
+
+<p>There is a couple of classes which is related to the end result of my ORM implementation including Database layer, DataAccess, DataMapper, and dataStorage or Repository and the most important part is Data Models, I will not be able to describe the whole code but I will go through the most important parts of it to give the complete picture.
+First I created a custom attributes that their only purpose to describe the model in similar way that the related table has been described in the database, so every table has column name and primary key and 1 or more relation to different tables, and the custom attributes which has been created described like below</p>
+
+<pre><code>[DataSource(Name = "Sites_Departments", SourceType = Enums.DataSourceType.DBTable, AccessType = Enums.DataSourceAccessType.SingleSource)]
+public class SiteDepartment : DataModel
+{
+     [IsIDField]
+     [DbColumn("ID")]
+     public int ID { get; set; }
+
+     [DbColumn("SiteID")]
+     public int SiteID { get; set; }
+
+     [DbColumn("DepartmentID")]
+     public int DepartmentID { get; set; }
+
+     [DataRelation(Name = "SiteID_Site.ID", WithDataModel = typeof(Site), OnDataModelKey = "ID", ThisKey = "SiteID")]
+     public Site Site { get; set; }
+
+     [DataRelation(Name = "DepartmentID_Department.ID", WithDataModel = typeof(Department), OnDataModelKey = "ID", ThisKey = "DepartmentID")]
+     public Department Department { get; set; }
+}
+</code></pre>
+
+<p>As it shown above the class is being described with datasource which has a name that reflects the table name and a type if it is table or whatever your source was and access type which refers that this table Is single table in the database or there is more table like this table. 
+The data source name could refer to web services URL or CSV file but I didn’t implement this part yet 
+IsIDField: describes if the field is a primary key or not. 
+DBColumn: describes the Name of the column in the database table
+DataRelation: describes the foreign key relation, with one small thing to take into consideration that WithDataModel part should refer to an existing class/Model
+In case of data access type was distributed there will be a need to set in the name the mapping table which holds the list of tables that shares the table structure and usage, like below
+    [DataSource(Name = "MonitoringServersInfo", SourceType = Enums.DataSourceType.DBTable, AccessType = Enums.DataSourceAccessType.Distributed)]
+So after this part of describing the decorators there should be a layer that understands those decorators which is DataAccess, 
+DataAccess is a Layer deals with abstracting the data Source routines to the upper layer by creating a wrapper around Data source Routines and present it to DataMapper, while also being able to understand the Class decorators, but before that in order to make everything looks more organized DataAccess Implements IDataAccess Interface, and the interface looks like below </p>
+
+<pre><code>public interface IDataAccess&lt;T&gt; where T : class, new()
+{
+    /// &lt;summary&gt;
+    /// 
+    /// &lt;/summary&gt;
+    /// &lt;param name="dataObject"&gt;&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    int Insert(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default);
+
+    /// &lt;summary&gt;
+    /// Update the data based on a predict expression 
+    /// &lt;/summary&gt;
+    /// &lt;param name="dataObject"&gt;Object to be updated&lt;/param&gt;
+    /// &lt;param name="predicate"&gt;Expression&lt;Func&lt;T, bool&gt;&gt; predicate specify the expression that should be evaluated&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    bool Update(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default);
+
+    /// &lt;summary&gt;
+    /// Delete Data from the repository
+    /// &lt;/summary&gt;
+    /// &lt;param name="dataObject"&gt;the object you wish to delete&lt;/param&gt;
+    /// &lt;param name="where"&gt;Dictionary&lt;string,object&gt; Represents the where part that should be executed&lt;/param&gt;
+    /// &lt;returns&gt;bool status&lt;/returns&gt;
+    bool Delete(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default);
+
+    /// &lt;summary&gt;
+    /// 
+    /// &lt;/summary&gt;
+    /// &lt;param name="id"&gt;&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    T GetById(long id, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true);
+
+    /// &lt;summary&gt;
+    /// Gets the data from repository 
+    /// &lt;/summary&gt;
+    /// &lt;param name="fields"&gt;List&lt;string&gt; represents the fields that should be set&lt;/param&gt;
+    /// &lt;param name="where"&gt;Dictionary&lt;string,object&gt; Represents the where part that should be executed&lt;/param&gt;
+    /// &lt;param name="limit"&gt;Number of T objects to be populated&lt;/param&gt;
+    /// &lt;returns&gt;IQueryable&lt;T&gt;  Results&lt;/returns&gt;
+    IEnumerable&lt;T&gt; Get(Dictionary&lt;string, object&gt; where, int limit = 25, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true);
+
+    /// &lt;summary&gt;
+    /// Gets the data from the repository and filter it based on the specified predicate expression
+    /// &lt;/summary&gt;
+    /// &lt;param name="predicate"&gt;Expression&lt;Func&lt;T, bool&gt;&gt; predicate specify the expression that should be evaluated&lt;/param&gt;
+    /// &lt;returns&gt;IQueryable&lt;T&gt;  Results&lt;/returns&gt;
+    IEnumerable&lt;T&gt; Get(Expression&lt;Func&lt;T, bool&gt;&gt; predicate, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true);
+
+    /// &lt;summary&gt;
+    /// Get all the data from the Repo
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    IEnumerable&lt;T&gt; GetAll(string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true);
+
+
+    #region Native SQL Execute Commands
+
+    IEnumerable&lt;T&gt; GetAll(string sql);
+
+    int Insert(string sql);
+
+    bool Update(string sql);
+
+    bool Delete(string sql);
+
+    #endregion
+}
+</code></pre>
+
+<p>As you can see that IDataAccess is a typed class that describes the functions to be implemented by DataAccess such as insert, update, delete, get, getall, and getbyid.
+This interface can be used implemented to DB-DataAccess, CSV-DataAccess, and WS-DataAccess…etc. but since it is typed and it holds the type of the model that uses it at run time there should be away to extract model information, so I created another class will be able to do so, and this class will be called from DataAccess Class constructor, the class will parse all the attributes of the model and put it in a schema object which will be read and understood from the DataAccess</p>
+
+<pre><code>public class DataSourceSchema&lt;T&gt; where T: DataModel, new()
+{
+    public string DataSourceName { get; set; }
+    public Enums.DataSourceType DataSourceType { set; get; }
+    public Enums.DataSourceAccessType DataSourceAccessType { get; set; }
+
+    public string IDFieldName { set; get; }
+
+    public List&lt;DataField&gt; DataFields { get; set; }
+
+
+    /***
+    * Private functions.
+    */
+    /// &lt;summary&gt;
+    /// Tries to read the TableName attribute value if it exists; if it doesn't it throws and exception
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;TableName attribute value (string), if exists.&lt;/returns&gt;
+    private void tryReadDataSourceAttributeValue()
+    {
+        //Get the table name attribute
+        IEnumerable&lt;Attribute&gt; dataSourceAtt = typeof(T).GetCustomAttributes(typeof(DataSourceAttribute));
+
+        // This mean that the Class is unstructured Class and it could be related to table/function or procedure or not.
+        if (dataSourceAtt.Count() &gt; 0)
+        {
+            var dsAttr = ((DataSourceAttribute)dataSourceAtt.First());
+
+            if (dsAttr != null)
+            {
+                if (!string.IsNullOrEmpty(dsAttr.Name)) DataSourceName = dsAttr.Name;
+
+                if (dsAttr.SourceType != null) DataSourceType = dsAttr.SourceType;
+
+                if (dsAttr.AccessType != null) DataSourceAccessType = dsAttr.AccessType;
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Tries to read the Class Db Properties, which are the properties marked with DbColumn Attribute. It tries to resolve the other attribute values, if they exist, 
+    /// otherwise, it assigns the default values.
+    /// Write the results to the inner List of DataFields
+    /// &lt;/summary&gt;
+    private void tryReadClassDataFields()
+    {
+        this.DataFields = new List&lt;DataField&gt;();
+
+        var tableFields = typeof(T)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property =&gt; property.GetCustomAttribute&lt;DbColumnAttribute&gt;() != null)
+            .ToList();
+
+        var relationFields = typeof(T)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property =&gt; property.GetCustomAttribute&lt;DataRelationAttribute&gt;() != null)
+            .ToList();
+
+        var allClassFields = tableFields.Concat(relationFields).ToList();
+
+        //If no exception was thrown, proceed to processing the class fields
+        foreach (var field in allClassFields)
+        {
+            var newDataField = new DataField();
+
+            newDataField.Name = field.Name;
+
+            if (field.GetCustomAttribute&lt;DbColumnAttribute&gt;() != null)
+            {
+                newDataField.TableField = new DbTableField()
+                {
+                    ColumnName = field.GetCustomAttribute&lt;DbColumnAttribute&gt;().Name,
+                    IsIDField = field.GetCustomAttribute&lt;IsIDFieldAttribute&gt;() != null ? field.GetCustomAttribute&lt;IsIDFieldAttribute&gt;().Status : false,
+                    AllowNull = field.GetCustomAttribute&lt;AllowNullAttribute&gt;() != null ? field.GetCustomAttribute&lt;AllowNullAttribute&gt;().Status : false,
+                    AllowIDInsert = field.GetCustomAttribute&lt;AllowIDInsertAttribute&gt;() != null ? field.GetCustomAttribute&lt;AllowIDInsertAttribute&gt;().Status : false,
+                    FieldType = field.PropertyType
+                };
+            }
+
+            if (field.GetCustomAttribute&lt;DataRelationAttribute&gt;() != null)
+            {
+                newDataField.Relation = new DbRelation()
+                {
+                    DataField = field.Name,
+                    RelationName = field.GetCustomAttribute&lt;DataRelationAttribute&gt;().Name,
+                    WithDataModel = field.GetCustomAttribute&lt;DataRelationAttribute&gt;().WithDataModel,
+                    OnDataModelKey = field.GetCustomAttribute&lt;DataRelationAttribute&gt;().OnDataModelKey,
+                    ThisKey = field.GetCustomAttribute&lt;DataRelationAttribute&gt;().ThisKey,
+                    RelationType = field.GetCustomAttribute&lt;DataRelationAttribute&gt;().RelationType
+                };
+            }
+
+            this.DataFields.Add(newDataField);
+        }
+
+        //Set the IDFieldName variable to the DbColumn name of the ID.
+        if (this.DataFields.Count &gt; 0)
+        {
+            var field = this.DataFields.Find(item =&gt; item.TableField != null &amp;&amp; item.TableField.IsIDField == true);
+
+            if (field != null)
+            {
+                this.IDFieldName = field.TableField.ColumnName;
+            }
+        }
+    }
+
+
+    public DataSourceSchema()
+    {
+        try
+        {
+            tryReadDataSourceAttributeValue();
+            tryReadClassDataFields();
+        }
+        catch (Exception ex)
+        {
+            throw ex.InnerException;
+        }
+    }
+
+
+    /***
+     * Getters.
+     * They support accessing a dynamic version of this object's data
+     */
+    public string GetDataSourceName()
+    {
+        return this.DataSourceName;
+    }
+
+    public Enums.DataSourceType GetDataSourceType()
+    {
+        return this.DataSourceType;
+    }
+
+    public Enums.DataSourceAccessType GetDataSourceAccessType()
+    {
+        return this.DataSourceAccessType;
+    }
+
+    public string GetIDFieldName()
+    {
+        return this.IDFieldName;
+    }
+
+    public List&lt;DataField&gt; GetDataFields()
+    {
+        return this.DataFields;
+    }
+
+}
+</code></pre>
+
+<p>Since DataSourceSchema Class is typed it will be able to extract Model Info/Attributes at run time and the type will be passed from DataAccess Class.<br>
+No jumping to DataAccess, as it has been mentioned before DataAccess Implementation will act as wrapper for another Library that I created before which deals with database Generic Select, Insert, Update and Delete, you can write your own it doesn’t matter but this library that I wrote evolved to cater for all sort of MS SQL routines such as selecting from functions, execute store procedures, update where and insert where, select where, and what columns to select and how many rows to be returned and so on so forth. You will find this library in the project zip file it needs some refactoring because it was incremental development for this library but as far as your concern it works like charm, any way since data access is a logical representation related with how the model should get, modify, delete the data. You could hook to it any non SQL data repository such as Web services, NoSQL, CSV file...etc.</p>
+
+<pre><code>public class DataAccess&lt;T&gt; : IDataAccess&lt;T&gt; where T : DataModel, new()
+{
+    /**
+     * Private instance variables
+     */
+    private DataSourceSchema&lt;T&gt; Schema;
+
+    private static DBLib DBRoutines = new DBLib();
+
+    /// &lt;summary&gt;
+    /// This is a private function. It is responsible for returning a list of the data relations on this data model translated to a list of SqlJoinRelation objects.
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;List of SqlJoinRelation objects&lt;/returns&gt;
+    private List&lt;SqlJoinRelation&gt; GetDataRelations()
+    {
+        //Table Relations Map
+        //To be sent to the DB Lib for SQL Query generation
+        List&lt;SqlJoinRelation&gt; TableRelationsMap = new List&lt;SqlJoinRelation&gt;();
+
+        //TableRelationsList
+        //To be used to looking up the relations and extracting information from them and copying them into the TableRelationsMap
+        List&lt;DbRelation&gt; DbRelationsList = Schema.DataFields.Where(field =&gt; field.Relation != null).Select&lt;DataField, DbRelation&gt;(field =&gt; field.Relation).ToList&lt;DbRelation&gt;();
+
+        //Start processing the list of table relations
+        if (DbRelationsList != null &amp;&amp; DbRelationsList.Count() &gt; 0)
+        {
+            //Foreach relation in the relations list, process it and construct the big TablesRelationsMap
+            foreach (var relation in DbRelationsList)
+            {
+                //Create a temporary map for this target table relation
+                var joinedTableInfo = new SqlJoinRelation();
+
+                //Get the data model we're in relation with.
+                Type relationType = relation.WithDataModel;
+
+                //Build a data source schema for the data model we're in relation with.
+                var generalModelSchemaType = typeof(DataSourceSchema&lt;&gt;);
+                var specialModelSchemaType = generalModelSchemaType.MakeGenericType(relationType);
+                dynamic joinedModelSchema = Activator.CreateInstance(specialModelSchemaType);
+
+                //Get it's Data Fields.
+                List&lt;DataField&gt; joinedModelFields = joinedModelSchema.GetDataFields();
+
+                //Get the table column names - exclude the ID field name.
+                List&lt;string&gt; joinedModelTableColumns = joinedModelFields
+                    .Where(field =&gt; field.TableField != null)
+                    .Select&lt;DataField, string&gt;(field =&gt; field.TableField.ColumnName)
+                    .ToList&lt;string&gt;();
+
+                //Get the field that describes the relation key from the target model schema
+                DataField joinedModelKey = joinedModelFields.Find(item =&gt; item.TableField != null &amp;&amp; item.Name == relation.OnDataModelKey);
+
+                //Get the field that describes our key on which we are in relation with the target model
+                DataField thisKey = Schema.DataFields.Find(item =&gt; item.TableField != null &amp;&amp; item.Name == relation.ThisKey);
+
+                if (thisKey != null &amp;&amp; joinedModelKey != null)
+                {
+                    //Initialize the temporary map and add it to the original relations map
+
+                    joinedTableInfo.RelationType = relation.RelationType.ToString();
+                    joinedTableInfo.MasterTableName = Schema.DataSourceName;
+                    joinedTableInfo.MasterTableKey = thisKey.TableField.ColumnName;
+                    joinedTableInfo.JoinedTableName = joinedModelSchema.GetDataSourceName();
+                    joinedTableInfo.JoinedTableKey = joinedModelKey.TableField.ColumnName;
+                    joinedTableInfo.JoinedTableColumns = joinedModelTableColumns;
+
+                    //Add the relation keys to the TableRelationsMap
+                    TableRelationsMap.Add(joinedTableInfo);
+                }
+
+            }//end-foreach
+
+        }//end-outer-if
+
+        return TableRelationsMap;
+    }
+
+
+    /**
+     * Repository Constructor
+     */
+    public DataAccess() 
+    {
+        //Get the Table Name and List of Class Attributes
+        try
+        {
+            //Initialize the schema for the class T
+            this.Schema = new DataSourceSchema&lt;T&gt;();
+
+            //Check for absent or invalid DataModel attributes and throw the respective exception if they exist.
+            if(string.IsNullOrEmpty(Schema.DataSourceName))
+            {
+                throw new NoDataSourceNameException(typeof(T).Name);
+            }
+            else if(Schema.DataFields.Where(item =&gt; item.TableField != null).ToList().Count() == 0)
+            {
+                throw new NoTableFieldsException(typeof(T).Name);
+            }
+            else if(string.IsNullOrEmpty(Schema.IDFieldName))
+            {
+                throw new NoTableIDFieldException(typeof(T).Name);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+
+    public virtual int Insert(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
+    {
+        int rowID = 0;
+        Dictionary&lt;string, object&gt; columnsValues = new Dictionary&lt;string, object&gt;();
+
+        if (dataObject != null)
+        {
+            var properties = Schema.DataFields.Select(field =&gt; field.TableField).ToList();
+
+            foreach (var property in properties)
+            {
+                var dataObjectAttr = dataObject.GetType().GetProperty(property.ColumnName);
+
+                //Don't insert ID Fields into the Database
+                if(property.IsIDField == true)
+                {
+                    continue;
+                }
+
+                //Continue handling the properties
+                if (property.AllowNull == false &amp;&amp; dataObjectAttr != null)
+                {
+                    var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+                    if (dataObjectAttrValue != null)
+                    {
+                        columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                    }
+                    else
+                    {
+                        throw new Exception("The Property " + property.ColumnName + " in the " + dataObject.GetType().Name + " Table is not allowed to be null kindly annotate the property with [IsAllowNull]");
+                    }
+                }
+                else
+                {
+                    var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+                    if (dataObjectAttrValue != null)
+                    {
+                        columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                    }
+                }
+                //end-inner-if
+
+            }//end-foreach
+
+            try
+            {
+                rowID = DBRoutines.INSERT(tableName: Schema.DataSourceName, columnsValues: columnsValues, idFieldName: Schema.IDFieldName);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+        }//end-outer-if
+
+        return rowID;  
+    }
+
+
+    public virtual bool Delete(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
+    {
+        long ID = 0;
+
+        var dataObjectAttr = dataObject.GetType().GetProperty(Schema.IDFieldName);
+
+        if (dataObjectAttr == null)
+        {
+            throw new Exception("There is no available ID field. kindly annotate " + typeof(T).Name);
+        }
+        else 
+        {
+            var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+            if(dataObjectAttrValue == null)
+            {
+                throw new Exception("There is no available ID field is presented but not set kindly set the value of the ID field Object for the following class: " + typeof(T).Name);
+            }
+            else
+            {
+                long.TryParse(dataObjectAttrValue.ToString(),out ID);
+
+                return DBRoutines.DELETE(tableName: Schema.DataSourceName, idFieldName: Schema.IDFieldName, ID: ID);
+            }//end-inner-if-else
+        }//end-outer-if-else
+    }
+
+
+    public virtual bool Update(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
+    {
+        Dictionary&lt;string, object&gt; columnsValues = new Dictionary&lt;string, object&gt;();
+        bool status = false;
+
+        if (dataObject != null)
+        {
+            var properties = Schema.DataFields.Select(field =&gt; field.TableField).ToList();
+
+            foreach (var property in properties)
+            {
+                var dataObjectAttr = dataObject.GetType().GetProperty(property.ColumnName);
+
+                //Don't insert ID Fields into the Database
+                if(property.IsIDField == true)
+                {
+                    continue;
+                }
+
+                //Continue handling the properties
+                if (property.AllowNull == false &amp;&amp; dataObjectAttr != null)
+                {
+                    var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+                    if (dataObjectAttrValue != null)
+                    {
+                        columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                    }
+                    else
+                    {
+                        throw new Exception("The Property " + property.ColumnName + " in the " + dataObject.GetType().Name + " Table is not allowed to be null kindly annotate the property with [IsAllowNull]");
+                    }
+                }
+                else
+                {
+                    var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+                    if (dataObjectAttrValue != null)
+                    {
+                        columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                    }
+                }
+                //end-inner-if
+
+            }//end-foreach
+
+            try
+            {
+                status = DBRoutines.UPDATE(tableName: Schema.DataSourceName, columnsValues: columnsValues, wherePart: null);
+
+            }
+            catch (Exception ex)
+            {
+                throw ex.InnerException;
+            }
+
+        }//end-outer-if
+
+        return status;  
+    }
+
+
+    public virtual T GetById(long id, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+    {
+        DataTable dt = new DataTable();
+        string finalDataSourceName = string.Empty;
+
+        int maximumLimit = 1;
+        List&lt;string&gt; thisModelTableColumns;
+        List&lt;SqlJoinRelation&gt; dataRelations;
+        Dictionary&lt;string, object&gt; condition;
+
+        string errorMessage = string.Empty;
+
+        //Get our table columns from the schema
+        thisModelTableColumns = Schema.DataFields
+            .Where(field =&gt; field.TableField != null)
+            .Select&lt;DataField, string&gt;(field =&gt; field.TableField.ColumnName)
+            .ToList&lt;string&gt;();
+
+        //Decide on the Data Source Name
+        finalDataSourceName = (string.IsNullOrEmpty(dataSourceName) ? Schema.DataSourceName : dataSourceName);
+
+        //Validate the presence of the ID
+        if (id &lt;= 0)
+        {
+            errorMessage = String.Format("The ID Field is either null or zero. Kindly pass a valid ID. Class name: \"{0}\".", typeof(T).Name);
+            throw new Exception(errorMessage);
+        }
+
+        //Construct the record ID condition
+        condition = new Dictionary&lt;string, object&gt;();
+        condition.Add(Schema.IDFieldName, id);
+
+        //Proceed with getting the data
+        if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+        {
+            switch (IncludeDataRelations)
+            {
+                case true:
+                    //Get our data relations list (SqlJoinRelation objects)
+                    dataRelations = GetDataRelations();
+                    dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, condition, dataRelations, maximumLimit);
+                    break;
+
+                case false:
+                    dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, condition, maximumLimit);
+                    break;
+            }
+        }
+
+        //It will either return a data table with one row or zero rows
+        if (dt.Rows.Count == 0)
+        {
+            return (T)Activator.CreateInstance(typeof(T));
+        }
+        else
+        {
+            return dt.ConvertToList&lt;T&gt;(IncludeDataRelations).FirstOrDefault&lt;T&gt;() ?? null;
+        }
+    }
+
+
+    public virtual IEnumerable&lt;T&gt; Get(Expression&lt;Func&lt;T, bool&gt;&gt; predicate, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+    {
+        DataTable dt = new DataTable();
+
+        if (predicate == null) 
+        {
+            var errorMessage = string.Format("There is no defined Predicate. {0} ",typeof(T).Name);
+
+            throw new Exception(errorMessage);
+        }
+        else 
+        {
+            CustomExpressionVisitor ev = new CustomExpressionVisitor();
+
+            string whereClause = ev.Translate(predicate);
+
+            if (string.IsNullOrEmpty(dataSourceName))
+            {
+
+                if (string.IsNullOrEmpty(whereClause))
+                {
+                    dt = DBRoutines.SELECT(Schema.DataSourceName);
+                }
+                else
+                {
+                    dt = DBRoutines.SELECT(Schema.DataSourceName, whereClause);
+                }
+            }
+            else 
+            {
+                if (string.IsNullOrEmpty(whereClause))
+                {
+                    dt = DBRoutines.SELECT(dataSourceName);
+                }
+                else
+                {
+                    dt = DBRoutines.SELECT(dataSourceName, whereClause);
+                }
+            }
+        }
+
+        return dt.ConvertToList&lt;T&gt;(IncludeDataRelations);
+    }
+
+
+    public virtual IEnumerable&lt;T&gt; Get(Dictionary&lt;string, object&gt; whereConditions, int limit = 25, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+    {
+        DataTable dt = new DataTable();
+        string finalDataSourceName = string.Empty;
+
+        List&lt;string&gt; thisModelTableColumns;
+        List&lt;SqlJoinRelation&gt; dataRelations;
+
+        string errorMessage = string.Empty;
+
+        //Get our table columns from the schema
+        thisModelTableColumns = Schema.DataFields
+            .Where(field =&gt; field.TableField != null)
+            .Select&lt;DataField, string&gt;(field =&gt; field.TableField.ColumnName)
+            .ToList&lt;string&gt;();
+
+        //Decide on the Data Source Name
+        finalDataSourceName = (string.IsNullOrEmpty(dataSourceName) ? Schema.DataSourceName : dataSourceName);
+
+        //Validate the presence of the where conditions
+        if (whereConditions == null || whereConditions.Count  == 0)
+        {
+            errorMessage = String.Format("The \"whereConditions\" parameter is either null or empty. Kindly pass a valid \"whereConditions\" parameter. Class name: \"{0}\".", typeof(T).Name);
+            throw new Exception(errorMessage);
+        }
+
+
+        //Proceed with getting the data
+        if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+        {
+            switch (IncludeDataRelations)
+            {
+                case true:
+                    //Get our data relations list (SqlJoinRelation objects)
+                    dataRelations = GetDataRelations();
+                    dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, whereConditions, dataRelations, 0);
+                    break;
+
+                case false:
+                    dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, limit);
+                    break;
+            }
+        }
+
+        return dt.ConvertToList&lt;T&gt;(IncludeDataRelations);
+    }
+
+
+    public virtual IEnumerable&lt;T&gt; GetAll(string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+    {
+        DataTable dt = new DataTable();
+        string finalDataSourceName = string.Empty;
+
+        int maximumLimit = 0;
+        List&lt;string&gt; thisModelTableColumns;
+        Dictionary&lt;string, object&gt; whereConditions = null;
+        List&lt;SqlJoinRelation&gt; dataRelations;
+
+        //Get our table columns from the schema
+        thisModelTableColumns = Schema.DataFields
+            .Where(field =&gt; field.TableField != null)
+            .Select&lt;DataField, string&gt;(field =&gt; field.TableField.ColumnName)
+            .ToList&lt;string&gt;();
+
+        //Decide on the Data Source Name
+        finalDataSourceName = (string.IsNullOrEmpty(dataSourceName) ? Schema.DataSourceName : dataSourceName);
+
+        //Proceed with getting the data
+        if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+        {
+            switch(IncludeDataRelations)
+            { 
+                case true:
+                    //Get our data relations list (SqlJoinRelation objects)
+                    dataRelations = GetDataRelations();
+                    dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, null, dataRelations, 0);
+                    break;
+
+                case false:
+                    dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, maximumLimit);
+                    break;
+            }
+        }
+
+        return dt.ConvertToList&lt;T&gt;(IncludeDataRelations);
+    }
+
+
+    public virtual IEnumerable&lt;T&gt; GetAll(string sql)
+    {
+        DataTable dt = DBRoutines.SELECTFROMSQL(sql);
+
+        return dt.ConvertToList&lt;T&gt;();
+    }
+
+
+    public virtual int Insert(string sql)
+    {
+        int id = DBRoutines.INSERT(sql);
+
+        return id;
+    }
+
+
+    public virtual bool Update(string sql)
+    {
+        bool status = DBRoutines.UPDATE(sql);
+
+        return status;
+    }
+
+
+    public virtual bool Delete(string sql)
+    {
+        bool status = DBRoutines.DELETE(sql);
+
+        return status;
+    }
+
+} 
+</code></pre>
+
+<p>As it shows above from the class definition that it extends DataModel, Data Model is a class that supposed to deal with model persistence at a later stage, and due to the implementation of this class is incomplete I will not include nor discuss it for the time being 
+DBRoutines is the library that I previously discussed which deals with all SQL Inserts/Update/Delete and Select.
+Using DataAccess you have the option to send Native SQL Command or Sending expression Predicate.
+In the Last Stage there is DataMapper that extends DataAccess to give you the possibility to add your own functionality a long with the DataAccess functionality, or overriding DataAccess functions behavior, such as below example </p>
+
+<pre><code>public class SitesDepartmentsDataMapper : DataAccess&lt;SiteDepartment&gt;
+{
+    /// &lt;summary&gt;
+    /// Given a Site's ID, return the list of it's Departments.
+    /// &lt;/summary&gt;
+    /// &lt;param name="SiteID"&gt;Site.ID (int)&lt;/param&gt;
+    /// &lt;returns&gt;List of SiteDepartment objects&lt;/returns&gt;
+    public List&lt;SiteDepartment&gt; GetDepartmentsForSite(long SiteID)
+    {
+        Dictionary&lt;string, object&gt; condition = new Dictionary&lt;string,object&gt;();
+        condition.Add("SiteID", SiteID);
+
+        try
+        {
+            return Get(whereConditions: condition, limit: 0).ToList&lt;SiteDepartment&gt;();
+        }
+        catch(Exception ex)
+        {
+            throw ex.InnerException;
+        }
+    }
+
+}
+</code></pre>
+
+<p>Finally add all your DataMapper Objects to DBStorage which acts as thread safe singleton class to facilitate the access of your objects using a centralized location.</p>
+
+<pre><code>public sealed class DataStorage
+{
+    /***
+     * DataStorage Repositories
+     */
+
+    public SitesDepartmentsDataMapper Sites = new SitesDepartmentsDataMapper();
+
+    /***
+     * Singleton implementation with an attempted thread-safety using double-check locking
+     * @source: http://csharpindepth.com/articles/general/singleton.aspx
+     */
+    // internal datastorage singleton container
+    private static DataStorage _instance = null;
+
+    // lock for thread-safety laziness
+    private static readonly object _mutex = new object();
+
+    // empty constuctor
+    private DataStorage() { }
+
+    //The only public method, used to obtain an instance of DataStorage`
+    public static DataStorage Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                lock(_mutex)
+                {
+                    if (_instance == null)
+                    {
+                        _instance = new DataStorage();
+                    }
+                }
+            }
+
+            return _instance;
+        }
+    }
+}
+</code></pre>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/Software-Repos/ORM/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/Software-Repos/ORM/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/Software-Repos/ORM"></a> is maintained by <a href="https://github.com/Software-Repos">Software-Repos</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
