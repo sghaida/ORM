@@ -4,15 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ORM.Excepsions
+namespace ORM.Exceptions
 {
-    public class NoDataSourceNameException : System.Exception
+    public class NoTableIDFieldException : System.Exception
     {
         public override string Message
         {
             get
             {
-                return "Not DataSource Name was provided for the class. Kindly add a valid [DataSource(...)] Attribute to the class.";
+                return "No class property was marked as an ID Field with the attribute: [IsIDField], in the class. Kindly revise the class definition.";
             }
         }
 
@@ -29,9 +29,9 @@ namespace ORM.Excepsions
             }
         }
 
-        public NoDataSourceNameException() : base() { }
+        public NoTableIDFieldException() : base() { }
 
-        public NoDataSourceNameException(string className) : base() { this.Source = className; }
+        public NoTableIDFieldException(string className) : base() { this.Source = className; }
 
     }
 }

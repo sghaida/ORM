@@ -4,15 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ORM.Excepsions
+namespace ORM.Exceptions
 {
-    public class NoTableIDFieldException : System.Exception
+    public class NoTableFieldsException : System.Exception
     {
         public override string Message
         {
             get
             {
-                return "No class property was marked as an ID Field with the attribute: [IsIDField], in the class. Kindly revise the class definition.";
+                return "Couldn't find any class property marked with the [DbColumn] Attribute in the class. Kindly revise the class definition.";
             }
         }
 
@@ -29,9 +29,9 @@ namespace ORM.Excepsions
             }
         }
 
-        public NoTableIDFieldException() : base() { }
+        public NoTableFieldsException() : base() { }
 
-        public NoTableIDFieldException(string className) : base() { this.Source = className; }
+        public NoTableFieldsException(string className) : base() { this.Source = className; }
 
     }
 }

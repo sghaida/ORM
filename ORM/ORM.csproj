@@ -62,9 +62,9 @@
     <Compile Include="DataModels\Site.cs" />
     <Compile Include="DataModels\SiteDepartment.cs" />
     <Compile Include="Enums.cs" />
-    <Compile Include="Excepsions\NoDataSourceNameException.cs" />
-    <Compile Include="Excepsions\NoTableFieldsException.cs" />
-    <Compile Include="Excepsions\NoTableIDFieldException.cs" />
+    <Compile Include="Exceptions\NoDataSourceNameException.cs" />
+    <Compile Include="Exceptions\NoTableFieldsException.cs" />
+    <Compile Include="Exceptions\NoTableIDFieldException.cs" />
     <Compile Include="GLOBALS.cs" />
     <Compile Include="Helpers\DataAccessExtensions.cs" />
     <Compile Include="Helpers\DataTableExtensions.cs" />
