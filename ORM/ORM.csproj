@@ -61,7 +61,6 @@
     <Compile Include="DataModels\Department.cs" />
     <Compile Include="DataModels\Site.cs" />
     <Compile Include="DataModels\SiteDepartment.cs" />
-    <Compile Include="Enums.cs" />
     <Compile Include="Exceptions\NoDataSourceNameException.cs" />
     <Compile Include="Exceptions\NoTableFieldsException.cs" />
     <Compile Include="Exceptions\NoTableIDFieldException.cs" />

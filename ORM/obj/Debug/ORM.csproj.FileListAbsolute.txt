@@ -1,0 +1,4 @@
+C:\Users\sghaida\Documents\Visual Studio 2013\Projects\ORM\ORM\obj\Debug\ORM.dll
+C:\Users\sghaida\Documents\Visual Studio 2013\Projects\ORM\ORM\obj\Debug\ORM.pdb
+C:\Users\sghaida\Documents\Visual Studio 2013\Projects\ORM\ORM\bin\Debug\ORM.dll
+C:\Users\sghaida\Documents\Visual Studio 2013\Projects\ORM\ORM\bin\Debug\ORM.pdb

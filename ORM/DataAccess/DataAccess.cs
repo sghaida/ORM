@@ -1,6 +1,6 @@
 ﻿using ORM.DataAccess;
 using ORM.DataAttributes;
-using ORM.Excepsions;
+using ORM.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Data;
