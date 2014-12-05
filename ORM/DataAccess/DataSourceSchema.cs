@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
 using ORM;
 using ORM.DataAttributes;
 
@@ -14,8 +13,8 @@ namespace ORM.DataAccess
     public class DataSourceSchema<T> where T: DataModel, new()
     {
         public string DataSourceName { get; set; }
-        public Enums.DataSourceType DataSourceType { set; get; }
-        public Enums.DataSourceAccessType DataSourceAccessType { get; set; }
+        public GLOBALS.DataSource.Type DataSourceType { set; get; }
+        public GLOBALS.DataSource.AccessMethod DataSourceAccessMethod { get; set; }
 
         public string IDFieldName { set; get; }
 
@@ -41,11 +40,13 @@ namespace ORM.DataAccess
 
                 if (dsAttr != null)
                 {
-                    if (!string.IsNullOrEmpty(dsAttr.Name)) DataSourceName = dsAttr.Name;
+                    DataSourceType = dsAttr.Type;
+                    DataSourceAccessMethod = dsAttr.AccessMethod;
 
-                    if (dsAttr.SourceType != null) DataSourceType = dsAttr.SourceType;
-
-                    if (dsAttr.AccessType != null) DataSourceAccessType = dsAttr.AccessType;
+                    if (false == string.IsNullOrEmpty(dsAttr.Name))
+                    {
+                        DataSourceName = dsAttr.Name;
+                    }
                 }
             }
         }
@@ -86,6 +87,7 @@ namespace ORM.DataAccess
                         IsIDField = field.GetCustomAttribute<IsIDFieldAttribute>() != null ? field.GetCustomAttribute<IsIDFieldAttribute>().Status : false,
                         AllowNull = field.GetCustomAttribute<AllowNullAttribute>() != null ? field.GetCustomAttribute<AllowNullAttribute>().Status : false,
                         AllowIDInsert = field.GetCustomAttribute<AllowIDInsertAttribute>() != null ? field.GetCustomAttribute<AllowIDInsertAttribute>().Status : false,
+                        IsKey = field.GetCustomAttribute<IsKeyAttribute>() != null ? field.GetCustomAttribute<IsKeyAttribute>().Status : false,
                         FieldType = field.PropertyType
                     };
                 }
@@ -121,6 +123,10 @@ namespace ORM.DataAccess
         }
 
 
+        /// <summary>
+        /// Constructor.
+        /// Calls the private setters to initialize the schema over the DataModel T
+        /// </summary>
         public DataSourceSchema()
         {
             try
@@ -144,25 +150,30 @@ namespace ORM.DataAccess
             return this.DataSourceName;
         }
 
-        public Enums.DataSourceType GetDataSourceType()
+
+        public GLOBALS.DataSource.Type GetDataSourceType()
         {
             return this.DataSourceType;
         }
 
-        public Enums.DataSourceAccessType GetDataSourceAccessType()
+
+        public GLOBALS.DataSource.AccessMethod GetDataSourceAccessMethod()
         {
-            return this.DataSourceAccessType;
+            return this.DataSourceAccessMethod;
         }
+
 
         public string GetIDFieldName()
         {
             return this.IDFieldName;
         }
 
+
         public List<DataField> GetDataFields()
         {
             return this.DataFields;
         }
+
 
     }
 

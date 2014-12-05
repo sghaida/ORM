@@ -28,11 +28,11 @@ namespace ORM.DataAccess
             string SEPARATOR = ".";
             List<string> formattedColumnsNames = new List<string>();
 
-            if(!string.IsNullOrEmpty(tableName) && columns != null && columns.Count() > 0)
+            if (!string.IsNullOrEmpty(tableName) && columns != null && columns.Count() > 0)
             {
                 formattedColumnsNames = columns
                     .Select<string, string>(
-                        column => 
+                        column =>
                             String.Format("[{0}].[{1}] as '{2}{3}{4}'", tableName, column, tableName, SEPARATOR, column)
                     ).ToList<string>();
             }
@@ -42,7 +42,7 @@ namespace ORM.DataAccess
 
 
         //Load DLL Configs
-        public  static LoadConfigs config = new LoadConfigs();
+        public static LoadConfigs config = new LoadConfigs();
 
         //Get the connection String
         public static string ConnectionString_Lync = config.DllConfig.ConnectionStrings.ConnectionStrings["LyncConnectionString"].ConnectionString;
@@ -97,7 +97,6 @@ namespace ORM.DataAccess
 
             OleDbDataReader dr;
             string FinalSelectQuery = string.Empty;
-            List<string> Columns = new List<string>();
             string TRUTH_OPERATOR = "AND";
 
             StringBuilder SelectColumns = new StringBuilder("");
@@ -124,7 +123,7 @@ namespace ORM.DataAccess
                     string keysStatement = string.Empty;
 
                     //Decide the join type
-                    if (relation.RelationType == Enums.DataRelationType.INTERSECTION.ToString())
+                    if (GLOBALS.DataRelation.Type.INTERSECTION == relation.RelationType)
                     {
                         joinType = "INNER JOIN";
                     }
@@ -135,37 +134,37 @@ namespace ORM.DataAccess
                     }
 
                     //Construct the JOIN KEYS statement 
-                    keysStatement = String.Format("ON [{0}].[{1}] = [{2}].[{3}]", tableName, relation.MasterTableKey, relation.JoinedTableName, relation.JoinedTableKey);
+                    keysStatement = String.Format(" AS {4} ON [{0}].[{1}] = [{4}].[{3}]", tableName, relation.MasterTableKey, relation.JoinedTableName, relation.JoinedTableKey, relation.RelationName);
+
+                    foreach (string column in relation.JoinedTableColumns)
+                    {
+                        SelectColumns.Append(string.Format("{0}.{1} AS '{0}.{1}',", relation.RelationName, column));
+                    }
 
                     JoinStatement.Append(String.Format("{0} {1} {2} ", joinType, relation.JoinedTableName, keysStatement));
 
-                    //Construct the Joined Table Column Names by combining that table name and the column name, to avoid duplicate column names between tables
-                    var joinedTableColumns = ConstructUniqueTableColumnsNames(relation.JoinedTableName, relation.JoinedTableColumns.ToList<string>());
 
-                    Columns = Columns.Concat(joinedTableColumns).ToList();
                 }//end-foreach
             }//end-outer-if
 
 
             //Concatenate the Master Table Columns with the local list
-            if (masterTableColumns == null) masterTableColumns = new List<string>();
+            if (masterTableColumns == null)
+            {
+                masterTableColumns = new List<string>();
+            }
             masterTableColumns = masterTableColumns.Select<string, string>(col => String.Format("[{0}].[{1}]", tableName, col, tableName, col)).ToList();
-            Columns = masterTableColumns.Concat(Columns).ToList();
+            //Columns = masterTableColumns.Concat(Columns).ToList();
 
 
             //Handle the fields collection
-            if (Columns.Count > 0)
+            if (masterTableColumns.Count > 0)
             {
-                foreach (string field in Columns)
+                foreach (string field in masterTableColumns)
                 {
                     //selectedfields.Append(fieldName + ",");
                     if (!string.IsNullOrEmpty(field))
                     {
-                        //if (field.Contains("COUNT") || field.Contains("SUM") || field.Contains("YEAR") || field.Contains("MONTH") || field.Contains("DISTINCT"))
-                        //    SelectColumns.Append(field + ",");
-                        //else
-                        //    SelectColumns.Append(field + ",");
-
                         SelectColumns.Append(field + ",");
                     }
                 }
@@ -276,7 +275,7 @@ namespace ORM.DataAccess
                 FinalSelectQuery = string.Format("SELECT TOP({0}) {1}", limits, SelectColumns.ToString());
 
             //Add the JOINED tables part
-            if(JoinStatement.ToString().Length > 0)
+            if (JoinStatement.ToString().Length > 0)
                 FinalSelectQuery = String.Format("{0} FROM [{1}] {2}", FinalSelectQuery, tableName, JoinStatement);
             else
                 FinalSelectQuery = String.Format("{0} FROM [{1}]", FinalSelectQuery, tableName);
@@ -284,11 +283,11 @@ namespace ORM.DataAccess
             //Add the where conditions to the FINAL SELECT QUERY
             if (WhereStatement.ToString().Length > 0)
                 FinalSelectQuery = String.Format("{0} {1}", FinalSelectQuery, WhereStatement.ToString());
-            
+
             //Add the order by part
             if (OrderBy.ToString().Length > 0)
                 FinalSelectQuery = String.Format("{0} {1}", FinalSelectQuery, OrderBy.ToString());
-            
+
 
             //Initialize the connection and command
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
@@ -312,7 +311,7 @@ namespace ORM.DataAccess
         }
 
 
-        public DataTable SELECT(string tableName, string wherePart, string customConnectionString = null) 
+        public DataTable SELECT(string tableName, string wherePart, string customConnectionString = null)
         {
             DataTable dt = new DataTable();
             OleDbDataReader dr;
@@ -324,7 +323,7 @@ namespace ORM.DataAccess
             else
                 conn = DBInitializeConnection(ConnectionString_Lync);
 
-            string sqlQuery = string.Format("SELECT * FROM {0} WHERE {1}",tableName,wherePart);
+            string sqlQuery = string.Format("SELECT * FROM {0} WHERE {1}", tableName, wherePart);
 
             //Execute SQL Query
             OleDbCommand comm = new OleDbCommand(sqlQuery, conn);
@@ -1015,7 +1014,7 @@ namespace ORM.DataAccess
         /// </summary>
         /// <param name="SQL"></param>
         /// <returns></returns>
-        public int INSERT(string SQL) 
+        public int INSERT(string SQL)
         {
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
             OleDbCommand comm = new OleDbCommand(SQL, conn);
@@ -1121,14 +1120,14 @@ namespace ORM.DataAccess
             //Fields and values
             foreach (KeyValuePair<string, object> pair in columnsValues)
             {
-                fields.Append("[" + pair.Key + "],");
-
                 if (pair.Value == null)
                 {
+                    fields.Append("[" + pair.Key + "],");
                     values.Append("NULL" + ",");
                 }
                 else if (pair.Value is int || pair.Value is Double)
                 {
+                    fields.Append("[" + pair.Key + "],");
                     values.Append(pair.Value + ",");
                 }
                 else if (pair.Value is DateTime && (DateTime)pair.Value == DateTime.MinValue)
@@ -1137,6 +1136,7 @@ namespace ORM.DataAccess
                 }
                 else
                 {
+                    fields.Append("[" + pair.Key + "],");
                     values.Append("'" + pair.Value.ToString().Replace("'", "`") + "'" + ",");
                 }
             }
@@ -1170,7 +1170,7 @@ namespace ORM.DataAccess
         /// </summary>
         /// <param name="SQL"></param>
         /// <returns></returns>
-        public bool UPDATE(string SQL) 
+        public bool UPDATE(string SQL)
         {
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
             OleDbCommand comm = new OleDbCommand(SQL, conn);
@@ -1304,10 +1304,10 @@ namespace ORM.DataAccess
             }
             whereStatement.Remove(whereStatement.Length - 5, 5);
 
-            string insertQuery = string.Format("UPDATE  [{0}] SET {1} WHERE {2}", tableName, fieldsValues, whereStatement);
+            string updateQuery = string.Format("UPDATE  [{0}] SET {1} WHERE {2}", tableName, fieldsValues, whereStatement);
 
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
-            OleDbCommand comm = new OleDbCommand(insertQuery, conn);
+            OleDbCommand comm = new OleDbCommand(updateQuery, conn);
             comm.CommandTimeout = 360;
 
             try
@@ -1495,7 +1495,7 @@ namespace ORM.DataAccess
         /// </summary>
         /// <param name="SQL"></param>
         /// <returns></returns>
-        public bool DELETE(string SQL) 
+        public bool DELETE(string SQL)
         {
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
             OleDbCommand comm = new OleDbCommand(SQL, conn);
@@ -1579,18 +1579,26 @@ namespace ORM.DataAccess
         {
             StringBuilder whereStatement = new StringBuilder();
 
+            //
+            // Parse the where conitions
             foreach (KeyValuePair<string, object> pair in wherePart)
             {
                 Type valueType = pair.Value.GetType();
 
-                if (valueType == typeof(int) || valueType == typeof(Double))
+                if (valueType == typeof(int) || valueType == typeof(long) || valueType == typeof(Decimal) || valueType == typeof(Double))
+                {
                     whereStatement.Append("[" + pair.Key + "]=" + pair.Value + " AND ");
+                }
                 else
+                {
                     whereStatement.Append("[" + pair.Key + "]='" + pair.Value + "' AND ");
-
+                }
             }
+
             whereStatement.Remove(whereStatement.Length - 5, 5);
 
+            //
+            // Final DELETE SQL Statement
             string deleteQuery = string.Format("DELETE FROM [{0}] WHERE {1}", tableName, whereStatement);
 
             OleDbConnection conn = DBInitializeConnection(ConnectionString_Lync);
@@ -1707,12 +1715,13 @@ namespace ORM.DataAccess
 
     public class SqlJoinRelation
     {
-        public string RelationType { get; set; }
+        public GLOBALS.DataRelation.Type RelationType { get; set; }
         public string MasterTableName { get; set; }
         public string MasterTableKey { get; set; }
         public string JoinedTableName { get; set; }
         public string JoinedTableKey { get; set; }
         public List<string> JoinedTableColumns { get; set; }
+        public string RelationName { get; set; }
     }
 
 }

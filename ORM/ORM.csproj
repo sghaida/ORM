@@ -54,6 +54,7 @@
     <Compile Include="DataAttributes\DataSourceAttribute.cs" />
     <Compile Include="DataAttributes\DbColumnAttribute.cs" />
     <Compile Include="DataAttributes\IsIDFieldAttribute.cs" />
+    <Compile Include="DataAttributes\IsKeyAttribute.cs" />
     <Compile Include="DataMappers\DepartmentsDataMapper.cs" />
     <Compile Include="DataMappers\SitesDataMapper.cs" />
     <Compile Include="DataMappers\SitesDepartmentsDataMapper.cs" />
@@ -61,10 +62,15 @@
     <Compile Include="DataModels\Site.cs" />
     <Compile Include="DataModels\SiteDepartment.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="Excepsions\NoDataSourceNameException.cs" />
+    <Compile Include="Excepsions\NoTableFieldsException.cs" />
+    <Compile Include="Excepsions\NoTableIDFieldException.cs" />
     <Compile Include="Exceptions\NoDataSourceNameException.cs" />
     <Compile Include="Exceptions\NoTableFieldsException.cs" />
     <Compile Include="Exceptions\NoTableIDFieldException.cs" />
-    <Compile Include="Helpers\Extensions.cs" />
+    <Compile Include="GLOBALS.cs" />
+    <Compile Include="Helpers\DataAccessExtensions.cs" />
+    <Compile Include="Helpers\DataTableExtensions.cs" />
     <Compile Include="Helpers\HelperFunctions.cs" />
     <Compile Include="Helpers\MatchingExtention.cs" />
     <Compile Include="Libs\LoadConfigs.cs" />

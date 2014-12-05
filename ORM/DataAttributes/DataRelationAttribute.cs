@@ -36,7 +36,7 @@ namespace ORM.DataAttributes
         /// * UNION: The union of two data models. Equivalent to an SQL OUTER JOIN.
         /// * INTERSECTION: The intersection of two data models. Equivalent to an SQL INNER JOIN.
         /// </summary>
-        public Enums.DataRelationType RelationType { get; set; }
+        public GLOBALS.DataRelation.Type RelationType { get; set; }
 
         /// <summary>
         /// Relation Descriptive Name
@@ -44,20 +44,20 @@ namespace ORM.DataAttributes
         private string _name = string.Empty;
         public string Name
         {
-            set { this._name = value; }
             get
             {
                 if (string.IsNullOrEmpty(_name))
                 {
-                    //Sample: CountryID_Country.ID
-                    this._name = String.Format("{0}.{1}_{2}", WithDataModel.Name, OnDataModelKey, ThisKey);
+                    //Sample: countryid_country_countryid
+                    this._name = String.Format("{0}_{1}_{2}", ThisKey, WithDataModel.Name, OnDataModelKey).ToLower();
                 }
 
                 return _name;
             }
         }
 
-
+        //Empty Constrcutor
         public DataRelationAttribute() { }
+
     }
 }

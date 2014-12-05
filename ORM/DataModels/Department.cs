@@ -11,7 +11,7 @@ using ORM.DataAttributes;
 
 namespace ORM.DataModels
 {
-    [DataSource(Name = "Departments", SourceType = Enums.DataSourceType.DBTable, AccessType = Enums.DataSourceAccessType.SingleSource)]
+    [DataSource(Name = "Departments", Type = GLOBALS.DataSource.Type.DBTable, AccessMethod = GLOBALS.DataSource.AccessMethod.SingleSource)]
     public class Department : DataModel
     {
         [IsIDField]

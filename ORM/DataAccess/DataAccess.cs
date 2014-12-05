@@ -1,4 +1,7 @@
-﻿using System;
+﻿using ORM.DataAccess;
+using ORM.DataAttributes;
+using ORM.Excepsions;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -6,23 +9,17 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
 using ORM.Helpers;
-//using ORM.DataModels;
-using ORM.DataAttributes;
-using ORM.Exceptions;
-
 
 namespace ORM.DataAccess
 {
     public class DataAccess<T> : IDataAccess<T> where T : DataModel, new()
     {
-        /**
-         * Private instance variables
-         */
         private DataSourceSchema<T> Schema;
 
         private static DBLib DBRoutines = new DBLib();
+        private static readonly List<Type> NumericTypes = new List<Type>() { typeof(int), typeof(long), typeof(Int16), typeof(Int32), typeof(Int64) };
+
 
         /// <summary>
         /// This is a private function. It is responsible for returning a list of the data relations on this data model translated to a list of SqlJoinRelation objects.
@@ -73,8 +70,8 @@ namespace ORM.DataAccess
                     if (thisKey != null && joinedModelKey != null)
                     {
                         //Initialize the temporary map and add it to the original relations map
-
-                        joinedTableInfo.RelationType = relation.RelationType.ToString();
+                        joinedTableInfo.RelationName = relation.RelationName;
+                        joinedTableInfo.RelationType = relation.RelationType;
                         joinedTableInfo.MasterTableName = Schema.DataSourceName;
                         joinedTableInfo.MasterTableKey = thisKey.TableField.ColumnName;
                         joinedTableInfo.JoinedTableName = joinedModelSchema.GetDataSourceName();
@@ -124,37 +121,75 @@ namespace ORM.DataAccess
             }
         }
 
-        public virtual int Insert(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
+
+        public virtual int Insert(T dataObject, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
             int rowID = 0;
+            string finalDataSourceName = string.Empty;
             Dictionary<string, object> columnsValues = new Dictionary<string, object>();
-          
+            
+
+            //
+            // Decide the DataSource Name
+            if(false == string.IsNullOrEmpty(dataSourceName))
+            {
+                finalDataSourceName = dataSourceName;
+            }
+            else if(false == string.IsNullOrEmpty(Schema.DataSourceName))
+            {
+                finalDataSourceName = Schema.DataSourceName;
+            }
+            else
+            {
+                throw new Exception("Insert Error: No Data Source was provided in the " + dataObject.GetType().Name + ". Kindly review the class definition or the data mapper definition.");
+            }
+
+
+            //
+            // Process the data object and attempt to insert it into the data source
             if (dataObject != null)
             {
-                var properties = Schema.DataFields.Select(field => field.TableField).ToList();
+                // Get only the Data Fields from Schema which have TableFields objects
+                var objectSchemaFields = Schema.DataFields
+                    .Where(field => field.TableField != null)
+                    .ToList<DataField>();
 
-                foreach (var property in properties)
+                foreach (var field in objectSchemaFields)
                 {
-                    var dataObjectAttr = dataObject.GetType().GetProperty(property.ColumnName);
-
-                    //Don't insert ID Fields into the Database
-                    if(property.IsIDField == true)
+                    // Don't insert the ID Field in the Data Source, unless it's marked as AllowIDInsert
+                    if (field.TableField.IsIDField == true && field.TableField.AllowIDInsert == false)
                     {
                         continue;
                     }
 
+                    // Get the property value
+                    var dataObjectAttr = dataObject.GetType().GetProperty(field.Name);
+
                     //Continue handling the properties
-                    if (property.AllowNull == false && dataObjectAttr != null)
+                    if (field.TableField.AllowNull == false && dataObjectAttr != null)
                     {
                         var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
 
                         if (dataObjectAttrValue != null)
                         {
-                            columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                            //
+                            // Only update the int/long values to zeros if they are not foreign keys
+                            if (true == NumericTypes.Contains(field.TableField.FieldType))
+                            {
+                                var value = Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType);
+
+                                if (Convert.ToInt64(value) <= 0 && field.TableField.IsKey == true)
+                                {
+                                    //continue;
+                                    throw new Exception("The Property " + field.TableField.ColumnName + " in the " + dataObject.GetType().Name + " Table is a foreign key and it is not allowed to be null. Kindly set the property value.");
+                                }
+                            }
+                            
+                            columnsValues.Add(field.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType));
                         }
                         else
                         {
-                            throw new Exception("The Property " + property.ColumnName + " in the " + dataObject.GetType().Name + " Table is not allowed to be null kindly annotate the property with [IsAllowNull]");
+                            throw new Exception("The Property " + field.TableField.ColumnName + " in the " + dataObject.GetType().Name + " Table is not allowed to be null kindly annotate the property with [IsAllowNull]");
                         }
                     }
                     else
@@ -163,7 +198,19 @@ namespace ORM.DataAccess
 
                         if (dataObjectAttrValue != null)
                         {
-                            columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                            //
+                            // Only update the int/long values to zeros if they are not foreign keys
+                            if (true == NumericTypes.Contains(field.TableField.FieldType))
+                            {
+                                var value = Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType);
+
+                                if (Convert.ToInt64(value) <= 0 && field.TableField.IsKey == true)
+                                {
+                                    continue;
+                                }
+                            }
+                            
+                            columnsValues.Add(field.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType));
                         }
                     }
                     //end-inner-if
@@ -172,7 +219,7 @@ namespace ORM.DataAccess
 
                 try
                 {
-                    rowID = DBRoutines.INSERT(tableName: Schema.DataSourceName, columnsValues: columnsValues, idFieldName: Schema.IDFieldName);
+                    rowID = DBRoutines.INSERT(tableName: finalDataSourceName, columnsValues: columnsValues, idFieldName: Schema.IDFieldName);
                 }
                 catch (Exception ex)
                 {
@@ -184,66 +231,99 @@ namespace ORM.DataAccess
             return rowID;  
         }
 
-
-        public virtual bool Delete(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
+        
+        public virtual bool Update(T dataObject, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
-            long ID = 0;
-
-            var dataObjectAttr = dataObject.GetType().GetProperty(Schema.IDFieldName);
-
-            if (dataObjectAttr == null)
-            {
-                throw new Exception("There is no available ID field. kindly annotate " + typeof(T).Name);
-            }
-            else 
-            {
-                var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
-
-                if(dataObjectAttrValue == null)
-                {
-                    throw new Exception("There is no available ID field is presented but not set kindly set the value of the ID field Object for the following class: " + typeof(T).Name);
-                }
-                else
-                {
-                    long.TryParse(dataObjectAttrValue.ToString(),out ID);
-
-                    return DBRoutines.DELETE(tableName: Schema.DataSourceName, idFieldName: Schema.IDFieldName, ID: ID);
-                }//end-inner-if-else
-            }//end-outer-if-else
-        }
-
-
-        public virtual bool Update(T dataObject, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default)
-        {
-            Dictionary<string, object> columnsValues = new Dictionary<string, object>();
             bool status = false;
+            string finalDataSourceName = string.Empty;
+            Dictionary<string, object> columnsValues = new Dictionary<string, object>();
+            Dictionary<string, object> whereConditions = new Dictionary<string, object>();
 
+            //
+            // Decide the DataSource Name 
+            if (false == string.IsNullOrEmpty(dataSourceName))
+            {
+                finalDataSourceName = dataSourceName;
+            }
+            else if (false == string.IsNullOrEmpty(Schema.DataSourceName))
+            {
+                finalDataSourceName = Schema.DataSourceName;
+            }
+            else
+            {
+                throw new Exception("Insert Error: No Data Source was provided in the " + dataObject.GetType().Name + ". Kindly review the class definition or the data mapper definition.");
+            }
+
+
+            //
+            // Process the data object and attempt to insert it into the data source
             if (dataObject != null)
             {
-                var properties = Schema.DataFields.Select(field => field.TableField).ToList();
+                // Get only the Data Fields from Schema which have TableFields objects
+                var objectSchemaFields = Schema.DataFields
+                    .Where(field => field.TableField != null)
+                    .ToList<DataField>();
 
-                foreach (var property in properties)
+                foreach (var field in objectSchemaFields)
                 {
-                    var dataObjectAttr = dataObject.GetType().GetProperty(property.ColumnName);
+                    // Get the property value
+                    var dataObjectAttr = dataObject.GetType().GetProperty(field.Name);
 
-                    //Don't insert ID Fields into the Database
-                    if(property.IsIDField == true)
+                    //
+                    // Don't update the ID Field in the Data Source, unless it's marked as AllowIDInsert
+                    // Add the data object ID into the WHERE CONDITIONS
+                    if (field.TableField.IsIDField == true)
                     {
-                        continue;
+                        var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+                        //
+                        // Put the ID Field in the WHERE CONDITIONS
+                        if (dataObjectAttrValue != null)
+                        {
+                            //
+                            // Add the ID Field and Value to the Where Conditions if it was not added already!
+                            if (false == whereConditions.Keys.Contains(field.TableField.ColumnName))
+                            { 
+                                whereConditions.Add(field.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType));
+                            }
+                        }
+                        else
+                        {
+                            throw new Exception("The Property " + field.TableField.ColumnName + " in the " + dataObject.GetType().Name + " Table is not SET! Kindly please set it to it's original value in order to decide what data to update accordingly.");
+                        }
+
+
+                        //
+                        // DON'T CONTINUE EXECUTION IF THE ID FIELD IS NOT ALLOWED TO BE CHANGED
+                        if(false == field.TableField.AllowIDInsert)
+                        { 
+                            continue;
+                        }
                     }
 
-                    //Continue handling the properties
-                    if (property.AllowNull == false && dataObjectAttr != null)
+                    // 
+                    // Add the data object fields into the COLUMNS-VALUES dictionary
+                    // This dictionary contains the values to be updated
+                    if (field.TableField.AllowNull == false && dataObjectAttr != null)
                     {
                         var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
 
                         if (dataObjectAttrValue != null)
                         {
-                            columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
-                        }
-                        else
-                        {
-                            throw new Exception("The Property " + property.ColumnName + " in the " + dataObject.GetType().Name + " Table is not allowed to be null kindly annotate the property with [IsAllowNull]");
+                            //
+                            // Only update the int/long values to zeros if they are not foreign keys
+                            if (true == NumericTypes.Contains(field.TableField.FieldType))
+                            {
+                                var value = Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType);
+
+                                if (Convert.ToInt64(value) <= 0 && field.TableField.IsKey == true)
+                                {
+                                    //continue;
+                                    throw new Exception("The Property " + field.TableField.ColumnName + " in the " + dataObject.GetType().Name + " Table is a foreign key and it is not allowed to be null. Kindly set the property value.");
+                                }
+                            }
+
+                            columnsValues.Add(field.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType));
                         }
                     }
                     else
@@ -252,7 +332,19 @@ namespace ORM.DataAccess
 
                         if (dataObjectAttrValue != null)
                         {
-                            columnsValues.Add(property.ColumnName, Convert.ChangeType(dataObjectAttrValue, property.FieldType));
+                            //
+                            // Only update the int/long values to zeros if they are not foreign keys
+                            if (true == NumericTypes.Contains(field.TableField.FieldType))
+                            {
+                                var value = Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType);
+
+                                if (Convert.ToInt64(value) <= 0 && field.TableField.IsKey == true)
+                                {
+                                    continue;
+                                }
+                            }
+
+                            columnsValues.Add(field.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, field.TableField.FieldType));
                         }
                     }
                     //end-inner-if
@@ -261,8 +353,14 @@ namespace ORM.DataAccess
 
                 try
                 {
-                    status = DBRoutines.UPDATE(tableName: Schema.DataSourceName, columnsValues: columnsValues, wherePart: null);
-
+                    if (0 == whereConditions.Count)
+                    {
+                        throw new Exception("Update Error: Cannot update data object unless there is at least one WHERE CONDITION. Please revise the update procedures on " + dataObject.GetType().Name);
+                    }
+                    else
+                    {
+                        status = DBRoutines.UPDATE(tableName: finalDataSourceName, columnsValues: columnsValues, wherePart: whereConditions);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -271,11 +369,69 @@ namespace ORM.DataAccess
 
             }//end-outer-if
 
-            return status;  
+            return status;
         }
 
 
-        public virtual T GetById(long id, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+        public virtual bool Delete(T dataObject, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
+        {
+            long ID = 0;
+            string finalDataSourceName = string.Empty;
+            Dictionary<string, object> whereConditions = new Dictionary<string, object>();
+
+            DataField IDField;
+            string ObjectFieldNameWithIDAttribute = string.Empty;
+
+
+            //
+            // Decide the DataSource Name 
+            if (false == string.IsNullOrEmpty(dataSourceName))
+            {
+                finalDataSourceName = dataSourceName;
+            }
+            else if (false == string.IsNullOrEmpty(Schema.DataSourceName))
+            {
+                finalDataSourceName = Schema.DataSourceName;
+            }
+            else
+            {
+                throw new Exception("Insert Error: No Data Source was provided in the " + dataObject.GetType().Name + ". Kindly review the class definition or the data mapper definition.");
+            }
+
+
+            //
+            // Decide the IDField value
+            IDField = Schema.DataFields.Find(field => field.TableField != null && field.TableField.IsIDField == true);
+            
+            if(null == IDField)
+            {
+                throw new Exception("Delete Error: The Data Model does not have IDField property. Kindly mark the properties of " + typeof(T).Name + " with [IsIDField].");
+            }
+
+
+            //
+            // Get the object field that is marked with the IsIDField attribute
+            var dataObjectAttr = dataObject.GetType().GetProperty(IDField.Name);
+
+            var dataObjectAttrValue = dataObjectAttr.GetValue(dataObject, null);
+
+            if(dataObjectAttrValue == null)
+            {
+                throw new Exception("The ID Field's value is to NULL. Kindly set the value of the ID Field for the object of type: " + typeof(T).Name);
+            }
+            else
+            {
+                //long.TryParse(dataObjectAttrValue.ToString(), out ID);
+                //return DBRoutines.DELETE(tableName: finalDataSourceName, idFieldName: IDField.TableField.ColumnName, ID: ID);
+
+                whereConditions.Add(IDField.TableField.ColumnName, Convert.ChangeType(dataObjectAttrValue, IDField.TableField.FieldType));
+                return DBRoutines.DELETE(tableName: finalDataSourceName, wherePart: whereConditions);
+
+            }//end-inner-if-else
+        }
+
+
+        public virtual T GetById(long id, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
             DataTable dt = new DataTable();
             string finalDataSourceName = string.Empty;
@@ -308,20 +464,22 @@ namespace ORM.DataAccess
             condition.Add(Schema.IDFieldName, id);
 
             //Proceed with getting the data
-            if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+            if (Schema.DataSourceType == GLOBALS.DataSource.Type.DBTable)
             {
-                switch (IncludeDataRelations)
-                {
-                    case true:
-                        //Get our data relations list (SqlJoinRelation objects)
-                        dataRelations = GetDataRelations();
-                        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, condition, dataRelations, maximumLimit);
-                        break;
+                //switch (IncludeDataRelations)
+                //{
+                //    case true:
+                //        //Get our data relations list (SqlJoinRelation objects)
+                //        dataRelations = GetDataRelations();
+                //        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, condition, dataRelations, maximumLimit);
+                //        break;
 
-                    case false:
-                        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, condition, maximumLimit);
-                        break;
-                }
+                //    case false:
+                //        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, condition, maximumLimit);
+                //        break;
+                //}
+
+                dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, condition, maximumLimit);
             }
 
             //It will either return a data table with one row or zero rows
@@ -331,12 +489,12 @@ namespace ORM.DataAccess
             }
             else
             {
-                return dt.ConvertToList<T>(IncludeDataRelations).FirstOrDefault<T>() ?? null;
+                return dt.ConvertToList<T>().FirstOrDefault<T>() ?? null;
             }
         }
 
 
-        public virtual IEnumerable<T> Get(Expression<Func<T, bool>> predicate, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+        public virtual IEnumerable<T> Get(Expression<Func<T, bool>> predicate, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
             DataTable dt = new DataTable();
 
@@ -377,11 +535,11 @@ namespace ORM.DataAccess
                 }
             }
 
-            return dt.ConvertToList<T>(IncludeDataRelations);
+            return dt.ConvertToList<T>();
         }
 
 
-        public virtual IEnumerable<T> Get(Dictionary<string, object> whereConditions, int limit = 25, string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+        public virtual IEnumerable<T> Get(Dictionary<string, object> whereConditions, int limit = 25, string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
             DataTable dt = new DataTable();
             string finalDataSourceName = string.Empty;
@@ -409,27 +567,29 @@ namespace ORM.DataAccess
 
 
             //Proceed with getting the data
-            if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+            if (Schema.DataSourceType == GLOBALS.DataSource.Type.DBTable)
             {
-                switch (IncludeDataRelations)
-                {
-                    case true:
-                        //Get our data relations list (SqlJoinRelation objects)
-                        dataRelations = GetDataRelations();
-                        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, whereConditions, dataRelations, 0);
-                        break;
+                //switch (IncludeDataRelations)
+                //{
+                //    case true:
+                //        //Get our data relations list (SqlJoinRelation objects)
+                //        dataRelations = GetDataRelations();
+                //        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, whereConditions, dataRelations, 0);
+                //        break;
 
-                    case false:
-                        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, limit);
-                        break;
-                }
+                //    case false:
+                //        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, limit);
+                //        break;
+                //}
+
+                dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, limit);
             }
 
-            return dt.ConvertToList<T>(IncludeDataRelations);
+            return dt.ConvertToList<T>();
         }
 
 
-        public virtual IEnumerable<T> GetAll(string dataSourceName = null, Enums.DataSourceType dataSource = Enums.DataSourceType.Default, bool IncludeDataRelations = true)
+        public virtual IEnumerable<T> GetAll(string dataSourceName = null, GLOBALS.DataSource.Type dataSourceType = GLOBALS.DataSource.Type.Default)
         {
             DataTable dt = new DataTable();
             string finalDataSourceName = string.Empty;
@@ -449,29 +609,31 @@ namespace ORM.DataAccess
             finalDataSourceName = (string.IsNullOrEmpty(dataSourceName) ? Schema.DataSourceName : dataSourceName);
             
             //Proceed with getting the data
-            if (Schema.DataSourceType == Enums.DataSourceType.DBTable)
+            if (Schema.DataSourceType == GLOBALS.DataSource.Type.DBTable)
             {
-                switch(IncludeDataRelations)
-                { 
-                    case true:
-                        //Get our data relations list (SqlJoinRelation objects)
-                        dataRelations = GetDataRelations();
-                        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, null, dataRelations, 0);
-                        break;
+                //switch(IncludeDataRelations)
+                //{ 
+                //    case true:
+                //        //Get our data relations list (SqlJoinRelation objects)
+                //        dataRelations = GetDataRelations();
+                //        dt = DBRoutines.SELECT_WITH_JOIN(finalDataSourceName, thisModelTableColumns, null, dataRelations, 0);
+                //        break;
 
-                    case false:
-                        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, maximumLimit);
-                        break;
-                }
+                //    case false:
+                //        dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, maximumLimit);
+                //        break;
+                //}
+
+                dt = DBRoutines.SELECT(finalDataSourceName, thisModelTableColumns, whereConditions, maximumLimit);
             }
 
-            return dt.ConvertToList<T>(IncludeDataRelations);
+            return dt.ConvertToList<T>();
         }
 
 
-        public virtual IEnumerable<T> GetAll(string sql)
+        public virtual IEnumerable<T> GetAll(string SQL_QUERY)
         {
-            DataTable dt = DBRoutines.SELECTFROMSQL(sql);
+            DataTable dt = DBRoutines.SELECTFROMSQL(SQL_QUERY);
 
             return dt.ConvertToList<T>();
         }
@@ -501,5 +663,4 @@ namespace ORM.DataAccess
         }
 
     }
-
 }

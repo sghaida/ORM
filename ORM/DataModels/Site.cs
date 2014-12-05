@@ -11,7 +11,7 @@ using ORM.DataAttributes;
 
 namespace ORM.DataModels
 {
-    [DataSource(Name = "Sites", SourceType = Enums.DataSourceType.DBTable, AccessType = Enums.DataSourceAccessType.SingleSource)]
+    [DataSource(Name = "Sites", Type = GLOBALS.DataSource.Type.DBTable, AccessMethod = GLOBALS.DataSource.AccessMethod.SingleSource)]
     public class Site : DataModel
     {
         [IsIDField]
@@ -30,7 +30,7 @@ namespace ORM.DataModels
         //[DbColumn("CountryId")]
         //public string CountryId { get; set; }
 
-        //[DataRelation(Name = "SiteID_CountryID", WithDataModel = typeof(Country), OnDataModelKey = "ID", ThisKey = "CountryId")]
+        //[DataRelation(WithDataModel = typeof(Country), OnDataModelKey = "ID", ThisKey = "CountryId")]
         //public Country SiteCountry { get; set; }
     }
 }

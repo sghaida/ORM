@@ -59,6 +59,11 @@ namespace ORM.DataAccess
         public bool AllowIDInsert { get; set; }
 
         /// <summary>
+        /// A true or false flag to indicate whether this is a foreign key in it's table or not.
+        /// </summary>
+        public bool IsKey { get; set; }
+
+        /// <summary>
         /// The reflected field type in the class.
         /// </summary>
         public Type FieldType { get; set; }
@@ -98,15 +103,15 @@ namespace ORM.DataAccess
 
         /// <summary>
         /// This sets the relation type between the two data models.
-        /// It can be one of the following options:
-        /// * UNION: The union of two data models. Equivalent to an SQL OUTER JOIN.
-        /// * INTERSECTION: The intersection of two data models. Equivalent to an SQL INNER JOIN.
+        /// It can be any value defined in the GLOBALS.DataRelation.Type
         /// </summary>
-        public Enums.DataRelationType RelationType { get; set; }
+        public GLOBALS.DataRelation.Type RelationType { get; set; }
+
 
         private static T Cast<T>(object o)
         {
             return (T)o;
         }
+
     }
 }
