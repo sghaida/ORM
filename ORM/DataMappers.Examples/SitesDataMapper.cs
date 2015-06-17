@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 using System.Linq.Expressions;
 
 using ORM.DataAccess;
-using ORM.DataModels;
+using ORM.DataModels.Examples;
 
-namespace ORM.DataMappers
+namespace ORM.DataMappers.Examples
 {
     public class SitesDataMapper : DataAccess<Site>
     {
-        
+
     }
 
 }

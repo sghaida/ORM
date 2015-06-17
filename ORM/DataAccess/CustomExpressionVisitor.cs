@@ -1,86 +1,56 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
+using ORM.DataAttributes;
 
 namespace ORM.DataAccess
 {
     public class CustomExpressionVisitor : ExpressionVisitor
     {
-
-        private StringBuilder sb;
+        private readonly string _whereClause = string.Empty;
         private string _orderBy = string.Empty;
-        private int? _skip = null;
-        private int? _take = null;
-        private string _toUpper = string.Empty;
         private string _toLower = string.Empty;
-        private string _whereClause = string.Empty;
+        private string _toUpper = string.Empty;
+        private StringBuilder _sb;
 
-        public int? Skip
+        public CustomExpressionVisitor()
         {
-            get
-            {
-                return _skip;
-            }
+            Take = null;
+            Skip = null;
+            _sb = new StringBuilder();
         }
 
-        public int? Take
-        {
-            get
-            {
-                return _take;
-            }
-        }
+        public int? Skip { get; private set; }
+        public int? Take { get; private set; }
 
         public string OrderBy
         {
-            get
-            {
-                return _orderBy;
-            }
+            get { return _orderBy; }
         }
 
         public string ToUpper
         {
-            get
-            {
-                return _toUpper;
-            }
+            get { return _toUpper; }
         }
 
         public string ToLower
         {
-            get
-            {
-                return _toLower;
-            }
+            get { return _toLower; }
         }
 
         public string WhereClause
         {
-            get
-            {
-                return _whereClause;
-            }
-        }
-
-        public CustomExpressionVisitor() 
-        {
-            sb = new StringBuilder();
+            get { return _whereClause; }
         }
 
         public string Translate(Expression expression)
         {
-            this.sb = new StringBuilder();
-            this.Visit(expression);
-            _whereClause = this.sb.ToString();
-            return _whereClause;
+            _sb = new StringBuilder();
+            Visit(expression);
+
+            return _sb.ToString();
         }
-
-
 
         private static Expression StripQuotes(Expression e)
         {
@@ -95,200 +65,198 @@ namespace ORM.DataAccess
         {
             if (m.Method.DeclaringType == typeof(Queryable) && m.Method.Name == "Where")
             {
-                this.Visit(m.Arguments[0]);
-                LambdaExpression lambda = (LambdaExpression)StripQuotes(m.Arguments[1]);
-                this.Visit(lambda.Body);
+                Visit(m.Arguments[0]);
+                var lambda = (LambdaExpression)StripQuotes(m.Arguments[1]);
+                Visit(lambda.Body);
                 return m;
             }
-            else if (m.Method.Name == "Take")
+            if (m.Method.Name == "Take")
             {
-                if (this.ParseTakeExpression(m))
+                if (ParseTakeExpression(m))
                 {
-                    Expression nextExpression = m.Arguments[0];
-                    return this.Visit(nextExpression);
+                    var nextExpression = m.Arguments[0];
+                    return Visit(nextExpression);
                 }
             }
             else if (m.Method.Name == "Skip")
             {
-                if (this.ParseSkipExpression(m))
+                if (ParseSkipExpression(m))
                 {
-                    Expression nextExpression = m.Arguments[0];
-                    return this.Visit(nextExpression);
+                    var nextExpression = m.Arguments[0];
+                    return Visit(nextExpression);
                 }
             }
             else if (m.Method.Name == "OrderBy")
             {
-                if (this.ParseOrderByExpression(m, "ASC"))
+                if (ParseOrderByExpression(m, "ASC"))
                 {
-                    Expression nextExpression = m.Arguments[0];
-                    return this.Visit(nextExpression);
+                    var nextExpression = m.Arguments[0];
+                    return Visit(nextExpression);
                 }
             }
             else if (m.Method.Name == "OrderByDescending")
             {
-                if (this.ParseOrderByExpression(m, "DESC"))
+                if (ParseOrderByExpression(m, "DESC"))
                 {
-                    Expression nextExpression = m.Arguments[0];
-                    return this.Visit(nextExpression);
+                    var nextExpression = m.Arguments[0];
+                    return Visit(nextExpression);
                 }
             }
-            else if (m.Method.Name == "ToLower") 
+            else if (m.Method.Name == "ToLower")
             {
-                if (this.ParseToLowerExpression(m, "LOWER"))
+                if (ParseToLowerExpression(m, "LOWER"))
                 {
-
-                    Expression nextExpression = m;
-                    return this.Visit(nextExpression);
-                    
+                    return null;
                 }
             }
             else if (m.Method.Name == "ToUpper")
-            {   
-                if (this.ParseToUpperExpression(m, "UPPER"))
+            {
+                if (ParseToUpperExpression(m, "UPPER"))
                 {
-                    Expression nextExpression = m;
-                    return this.Visit(nextExpression);
+                    var nextExpression = m.Arguments[0];
+                    return Visit(nextExpression);
                 }
             }
-            else if (m.Method.Name == "ToDateTime") 
+            else if (m.Method.Name == "ToDateTime")
             {
-                m.Method.Invoke(null,null);
+                m.Method.Invoke(null, null);
+            }
+            else if (m.Method.Name == "Input")
+            {
             }
 
             throw new NotSupportedException(string.Format("The method '{0}' is not supported", m.Method.Name));
         }
-
-       
 
         protected override Expression VisitUnary(UnaryExpression u)
         {
             switch (u.NodeType)
             {
                 case ExpressionType.Not:
-                    sb.Append(" NOT ");
-                    this.Visit(u.Operand);
+                    _sb.Append(" NOT ");
+                    Visit(u.Operand);
                     break;
                 case ExpressionType.Convert:
-                    this.Visit(u.Operand);
+                    Visit(u.Operand);
                     break;
                 case ExpressionType.TypeAs:
-                    this.Visit(u.Operand);
+                    Visit(u.Operand);
                     break;
                 default:
-                    throw new NotSupportedException(string.Format("The unary operator '{0}' is not supported", u.NodeType));
+                    throw new NotSupportedException(string.Format("The unary operator '{0}' is not supported",
+                        u.NodeType));
             }
             return u;
         }
 
         /// <summary>
-        /// 
         /// </summary>
         /// <param name="b"></param>
         /// <returns></returns>
         protected override Expression VisitBinary(BinaryExpression b)
         {
-            sb.Append("(");
-            this.Visit(b.Left);
+            _sb.Append("(");
+            Visit(b.Left);
 
             switch (b.NodeType)
             {
                 case ExpressionType.And:
-                    sb.Append(" AND ");
+                    _sb.Append(" AND ");
                     break;
 
                 case ExpressionType.AndAlso:
-                    sb.Append(" AND ");
+                    _sb.Append(" AND ");
                     break;
 
                 case ExpressionType.Or:
-                    sb.Append(" OR ");
+                    _sb.Append(" OR ");
                     break;
 
                 case ExpressionType.OrElse:
-                    sb.Append(" OR ");
+                    _sb.Append(" OR ");
                     break;
 
                 case ExpressionType.Equal:
                     if (IsNullConstant(b.Right))
                     {
-                        sb.Append(" IS ");
+                        _sb.Append(" IS ");
                     }
                     else
                     {
-                        sb.Append(" = ");
+                        _sb.Append(" = ");
                     }
                     break;
 
                 case ExpressionType.NotEqual:
                     if (IsNullConstant(b.Right))
                     {
-                        sb.Append(" IS NOT ");
+                        _sb.Append(" IS NOT ");
                     }
                     else
                     {
-                        sb.Append(" <> ");
+                        _sb.Append(" <> ");
                     }
                     break;
 
                 case ExpressionType.LessThan:
-                    sb.Append(" < ");
+                    _sb.Append(" < ");
                     break;
 
                 case ExpressionType.LessThanOrEqual:
-                    sb.Append(" <= ");
+                    _sb.Append(" <= ");
                     break;
 
                 case ExpressionType.GreaterThan:
-                    sb.Append(" > ");
+                    _sb.Append(" > ");
                     break;
 
                 case ExpressionType.GreaterThanOrEqual:
-                    sb.Append(" >= ");
+                    _sb.Append(" >= ");
                     break;
 
                 default:
-                    throw new NotSupportedException(string.Format("The binary operator '{0}' is not supported", b.NodeType));
-
+                    throw new NotSupportedException(string.Format("The binary operator '{0}' is not supported",
+                        b.NodeType));
             }
 
-            this.Visit(b.Right);
-            sb.Append(")");
+            Visit(b.Right);
+            _sb.Append(")");
             return b;
         }
 
         protected override Expression VisitConstant(ConstantExpression c)
         {
-            IQueryable q = c.Value as IQueryable;
+            var q = c.Value as IQueryable;
 
             if (q == null && c.Value == null)
             {
-                sb.Append("NULL");
+                _sb.Append("NULL");
             }
             else if (q == null)
             {
                 switch (Type.GetTypeCode(c.Value.GetType()))
                 {
                     case TypeCode.Boolean:
-                        sb.Append(((bool)c.Value) ? 1 : 0);
+                        _sb.Append(((bool)c.Value) ? 1 : 0);
                         break;
 
                     case TypeCode.String:
-                        sb.Append("'");
-                        sb.Append(c.Value);
-                        sb.Append("'");
+                        _sb.Append("'");
+                        _sb.Append(c.Value);
+                        _sb.Append("'");
                         break;
 
                     case TypeCode.DateTime:
-                        sb.Append("'");
-                        sb.Append(c.Value);
-                        sb.Append("'");
+                        _sb.Append("'");
+                        _sb.Append(c.Value);
+                        _sb.Append("'");
                         break;
 
                     case TypeCode.Object:
                         throw new NotSupportedException(string.Format("The constant for '{0}' is not supported", c.Value));
 
                     default:
-                        sb.Append(c.Value);
+                        _sb.Append(c.Value);
                         break;
                 }
             }
@@ -298,15 +266,51 @@ namespace ORM.DataAccess
 
         protected override Expression VisitMember(MemberExpression m)
         {
+            var fieldName = GetMemberName(m);
+
             if (m.Expression != null && m.Expression.NodeType == ExpressionType.Parameter)
             {
-                sb.Append(m.Member.Name);
+                //sb.Append(m.Member.Name);
+                _sb.Append(fieldName);
                 return m;
+            }
+            if (m.Expression != null && m.Expression.NodeType == ExpressionType.Constant)
+            {
+                var value = GetValue(m);
+
+                if (m.Type == typeof(string) || m.Type == typeof(char))
+                {
+                    _sb.Append("'" + value + "'");
+                }
+                else if (m.Type == typeof(DateTime))
+                {
+                    _sb.Append("'" + Convert.ToDateTime(value).ToString("yyyy-MM-dd hh:mm:ss.fff") + "'");
+                }
+                else
+                {
+                    _sb.Append(value);
+                }
+
+                return null;
+            }
+            if (m.Expression != null && m.Expression.NodeType == ExpressionType.MemberAccess)
+            {
+                var value = GetValue(m);
+
+                if (m.Type == typeof(string) || m.Type == typeof(char))
+                {
+                    _sb.Append("'" + value + "'");
+                }
+                else
+                {
+                    _sb.Append(value);
+                }
+
+                return null;
             }
 
             throw new NotSupportedException(string.Format("The member '{0}' is not supported", m.Member.Name));
         }
-
 
         protected bool IsNullConstant(Expression exp)
         {
@@ -315,21 +319,25 @@ namespace ORM.DataAccess
 
         private bool ParseOrderByExpression(MethodCallExpression expression, string order)
         {
-            UnaryExpression unary = (UnaryExpression)expression.Arguments[1];
-            LambdaExpression lambdaExpression = (LambdaExpression)unary.Operand;
+            var fieldName = GetMemberName(expression);
+            var unary = (UnaryExpression)expression.Arguments[1];
+            var lambdaExpression = (LambdaExpression)unary.Operand;
 
             lambdaExpression = (LambdaExpression)Evaluator.PartialEval(lambdaExpression);
 
-            MemberExpression body = lambdaExpression.Body as MemberExpression;
+            var body = lambdaExpression.Body as MemberExpression;
+
             if (body != null)
             {
                 if (string.IsNullOrEmpty(_orderBy))
                 {
-                    _orderBy = string.Format("{0} {1}", body.Member.Name, order);
+                    //_orderBy = string.Format("{0} {1}", body.Member.Name, order);
+                    _orderBy = string.Format("{0} {1}", fieldName, order);
                 }
                 else
                 {
-                    _orderBy = string.Format("{0}, {1} {2}", _orderBy, body.Member.Name, order);
+                    //_orderBy = string.Format("{0}, {1} {2}", _orderBy, body.Member.Name, order);
+                    _orderBy = string.Format("{0}, {1} {2}", _orderBy, fieldName, order);
                 }
 
                 return true;
@@ -340,12 +348,13 @@ namespace ORM.DataAccess
 
         private bool ParseSkipExpression(MethodCallExpression expression)
         {
-            ConstantExpression sizeExpression = (ConstantExpression)expression.Arguments[1];
+            //var fieldName = GetMemberName(expression);
+            var sizeExpression = (ConstantExpression)expression.Arguments[1];
 
             int size;
             if (int.TryParse(sizeExpression.Value.ToString(), out size))
             {
-                _skip = size;
+                Skip = size;
                 return true;
             }
 
@@ -354,12 +363,13 @@ namespace ORM.DataAccess
 
         private bool ParseTakeExpression(MethodCallExpression expression)
         {
-            ConstantExpression sizeExpression = (ConstantExpression)expression.Arguments[1];
+            //var fieldName = GetMemberName(expression);
+            var sizeExpression = (ConstantExpression)expression.Arguments[1];
 
             int size;
             if (int.TryParse(sizeExpression.Value.ToString(), out size))
             {
-                _take = size;
+                Take = size;
                 return true;
             }
 
@@ -368,47 +378,91 @@ namespace ORM.DataAccess
 
         private bool ParseToUpperExpression(MethodCallExpression expression, string toUpper)
         {
-            UnaryExpression unary = (UnaryExpression)expression.Arguments[1];
-            LambdaExpression lambdaExpression = (LambdaExpression)unary.Operand;
+            var fieldName = GetMemberName(expression);
 
-            MemberExpression body = lambdaExpression.Body as MemberExpression;
+            _toUpper = string.Format("{0}({1})", toUpper, fieldName);
+            _sb.Append(_toUpper);
 
-            if (body != null)
-            {
-                _toUpper = string.Format("({0}{1})", toUpper,body);
-
-                return true;
-            }
-
-            return false;
+            return true;
         }
 
         private bool ParseToLowerExpression(MethodCallExpression expression, string toLower)
         {
-            var member = ((MemberExpression)expression.Object).Member.Name;
-           
+            var fieldName = GetMemberName(expression);
 
-            _toLower = string.Format("{0}({1})", toLower,member);
-                
+            _toLower = string.Format("{0}({1})", toLower, fieldName);
+            _sb.Append(_toLower);
+
             return true;
-           
         }
 
-      
+        private string GetMemberName(MethodCallExpression expression)
+        {
+            string fieldName = null;
+            var memberExpression = (MemberExpression)expression.Object;
 
+            if (memberExpression != null)
+            {
+                var member = memberExpression.Member;
 
-        //protected override Expression VisitConstant(ConstantExpression node)
-        //{
-            
-        //    st.Append(node.Value);
-        //    return node;
-        //}
+                if (member.CustomAttributes != null && member.CustomAttributes.Any())
+                {
+                    var dbColumn =
+                        member.CustomAttributes.FirstOrDefault(item => item.AttributeType == typeof(DbColumnAttribute));
 
-        //protected override Expression VisitParameter(ParameterExpression node)
-        //{
-        //    st.Append(node.Name);
-        //    return node;
-        //}
+                    if (dbColumn != null && dbColumn.ConstructorArguments.Count > 0)
+                    {
+                        fieldName = Convert.ToString(dbColumn.ConstructorArguments.First().Value);
+                    }
+                    else
+                    {
+                        fieldName = member.Name;
+                    }
+                }
+                else
+                {
+                    fieldName = member.Name;
+                }
+            }
 
+            return fieldName;
+        }
+
+        private string GetMemberName(MemberExpression expression)
+        {
+            string fieldName;
+            var member = expression.Member;
+
+            if (member.CustomAttributes != null && member.CustomAttributes.Any())
+            {
+                var dbColumn =
+                    member.CustomAttributes.FirstOrDefault(item => item.AttributeType == typeof(DbColumnAttribute));
+
+                if (dbColumn != null && dbColumn.ConstructorArguments.Count > 0)
+                {
+                    fieldName = Convert.ToString(dbColumn.ConstructorArguments.First().Value);
+                }
+                else
+                {
+                    fieldName = member.Name;
+                }
+            }
+            else
+            {
+                fieldName = member.Name;
+            }
+
+            return fieldName;
+        }
+
+        private object GetValue(MemberExpression member)
+        {
+            var objectMember = Expression.Convert(member, typeof(object));
+            var getterLambda = Expression.Lambda<Func<object>>(objectMember);
+
+            var getter = getterLambda.Compile();
+
+            return getter();
+        }
     }
 }

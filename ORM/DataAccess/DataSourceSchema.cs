@@ -2,63 +2,74 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using ORM;
 using ORM.DataAttributes;
-
 
 namespace ORM.DataAccess
 {
-    public class DataSourceSchema<T> where T: DataModel, new()
+    public class DataSourceSchema<T> where T : DataModel, new()
     {
+        /// <summary>
+        ///     Constructor.
+        ///     Calls the private setters to initialize the schema over the DataModel T
+        /// </summary>
+        public DataSourceSchema()
+        {
+            try
+            {
+                TryReadDataSourceAttributeValue();
+                TryReadClassDataFields();
+            }
+            catch (Exception ex)
+            {
+                throw ex.InnerException;
+            }
+        }
+
         public string DataSourceName { get; set; }
-        public GLOBALS.DataSource.Type DataSourceType { set; get; }
-        public GLOBALS.DataSource.AccessMethod DataSourceAccessMethod { get; set; }
-
-        public string IDFieldName { set; get; }
-
+        public Globals.DataSource.Type DataSourceType { set; get; }
+        public Globals.DataSource.AccessMethod DataSourceAccessMethod { get; set; }
+        public string IdFieldName { set; get; }
         public List<DataField> DataFields { get; set; }
-
-
         /***
         * Private functions.
         */
+
         /// <summary>
-        /// Tries to read the TableName attribute value if it exists; if it doesn't it throws and exception
+        ///     Tries to read the TableName attribute value if it exists; if it doesn't it throws and exception
         /// </summary>
         /// <returns>TableName attribute value (string), if exists.</returns>
-        private void tryReadDataSourceAttributeValue()
+        private void TryReadDataSourceAttributeValue()
         {
             //Get the table name attribute
-            IEnumerable<Attribute> dataSourceAtt = typeof(T).GetCustomAttributes(typeof(DataSourceAttribute));
+            var dataSourceAtt = typeof(T).GetCustomAttributes(typeof(DataSourceAttribute));
 
             // This mean that the Class is unstructured Class and it could be related to table/function or procedure or not.
-            if (dataSourceAtt.Count() > 0)
+            var sourceAtt = dataSourceAtt as IList<Attribute> ?? dataSourceAtt.ToList();
+            if (!sourceAtt.Any()) return;
+
+            var dsAttr = ((DataSourceAttribute)sourceAtt.First());
+
+            if (dsAttr != null)
             {
-                var dsAttr = ((DataSourceAttribute)dataSourceAtt.First());
+                DataSourceType = dsAttr.Type;
+                DataSourceAccessMethod = dsAttr.AccessMethod;
 
-                if (dsAttr != null)
+                if (false == string.IsNullOrEmpty(dsAttr.Name))
                 {
-                    DataSourceType = dsAttr.Type;
-                    DataSourceAccessMethod = dsAttr.AccessMethod;
-
-                    if (false == string.IsNullOrEmpty(dsAttr.Name))
-                    {
-                        DataSourceName = dsAttr.Name;
-                    }
+                    DataSourceName = dsAttr.Name;
                 }
             }
         }
 
         /// <summary>
-        /// Tries to read the Class Db Properties, which are the properties marked with DbColumn Attribute. It tries to resolve the other attribute values, if they exist, 
-        /// otherwise, it assigns the default values.
-        /// Write the results to the inner List of DataFields
+        ///     Tries to read the Class Db Properties, which are the properties marked with DbColumn Attribute. It tries to resolve
+        ///     the other attribute values, if they exist,
+        ///     otherwise, it assigns the default values.
+        ///     Write the results to the inner List of DataFields
         /// </summary>
-        private void tryReadClassDataFields()
+        private void TryReadClassDataFields()
         {
-            this.DataFields = new List<DataField>();
+            DataFields = new List<DataField>();
 
             var tableFields = typeof(T)
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -73,32 +84,42 @@ namespace ORM.DataAccess
             var allClassFields = tableFields.Concat(relationFields).ToList();
 
             //If no exception was thrown, proceed to processing the class fields
-            foreach (var field in allClassFields)
+            foreach (var propertyInfo in allClassFields)
             {
                 var newDataField = new DataField();
 
-                newDataField.Name = field.Name;
+                newDataField.Name = propertyInfo.Name;
 
-                if (field.GetCustomAttribute<DbColumnAttribute>() != null)
+                if (propertyInfo.GetCustomAttribute<DbColumnAttribute>() != null)
                 {
-                    newDataField.TableField = new DbTableField()
+                    var dbColumnAttr = propertyInfo.GetCustomAttribute<DbColumnAttribute>();
+                    var isIdFieldAttr = propertyInfo.GetCustomAttribute<IsIdFieldAttribute>();
+                    var allowNullAttr = propertyInfo.GetCustomAttribute<AllowNullAttribute>();
+                    var allowIdInsertAttr = propertyInfo.GetCustomAttribute<AllowIdInsertAttribute>();
+                    var isKeyAttr = propertyInfo.GetCustomAttribute<IsForeignKeyAttribute>();
+                    var excludeAttr = propertyInfo.GetCustomAttribute<ExcludeAttribute>();
+
+                    newDataField.TableField = new DbTableField
                     {
-                        ColumnName = field.GetCustomAttribute<DbColumnAttribute>().Name,
-                        IsIDField = field.GetCustomAttribute<IsIDFieldAttribute>() != null ? field.GetCustomAttribute<IsIDFieldAttribute>().Status : false,
-                        AllowNull = field.GetCustomAttribute<AllowNullAttribute>() != null ? field.GetCustomAttribute<AllowNullAttribute>().Status : false,
-                        AllowIDInsert = field.GetCustomAttribute<AllowIDInsertAttribute>() != null ? field.GetCustomAttribute<AllowIDInsertAttribute>().Status : false,
-                        IsKey = field.GetCustomAttribute<IsKeyAttribute>() != null ? field.GetCustomAttribute<IsKeyAttribute>().Status : false,
-                        FieldType = field.PropertyType
+                        ColumnName = dbColumnAttr.Name,
+                        IsIdField = isIdFieldAttr != null && isIdFieldAttr.Status,
+                        AllowNull = allowNullAttr != null && allowNullAttr.Status,
+                        AllowIdInsert = allowIdInsertAttr != null && allowIdInsertAttr.Status,
+                        IsKey = isKeyAttr != null && isKeyAttr.Status,
+                        ExcludeOnSelect = excludeAttr != null && excludeAttr.OnSelect,
+                        ExcludeOnInsert = excludeAttr != null && excludeAttr.OnInsert,
+                        ExcludeOnUpdate = excludeAttr != null && excludeAttr.OnUpdate,
+                        FieldType = propertyInfo.PropertyType
                     };
                 }
 
-                if (field.GetCustomAttribute<DataRelationAttribute>() != null)
+                if (propertyInfo.GetCustomAttribute<DataRelationAttribute>() != null)
                 {
-                    var dataRelationAttribute = field.GetCustomAttribute<DataRelationAttribute>();
+                    var dataRelationAttribute = propertyInfo.GetCustomAttribute<DataRelationAttribute>();
 
-                    newDataField.Relation = new DbRelation()
+                    newDataField.Relation = new DbRelation
                     {
-                        DataField = field.Name,
+                        DataField = propertyInfo.Name,
                         RelationName = dataRelationAttribute.Name,
                         WithDataModel = dataRelationAttribute.WithDataModel,
                         OnDataModelKey = dataRelationAttribute.OnDataModelKey,
@@ -107,74 +128,48 @@ namespace ORM.DataAccess
                     };
                 }
 
-                this.DataFields.Add(newDataField);
+                DataFields.Add(newDataField);
             }
 
             //Set the IDFieldName variable to the DbColumn name of the ID.
-            if (this.DataFields.Count > 0)
-            {
-                var field = this.DataFields.Find(item => item.TableField != null && item.TableField.IsIDField == true);
+            if (DataFields.Count <= 0) return;
 
-                if (field != null)
-                {
-                    this.IDFieldName = field.TableField.ColumnName;
-                }
+            var field = DataFields.Find(item => item.TableField != null && item.TableField.IsIdField);
+
+            if (field != null)
+            {
+                IdFieldName = field.TableField.ColumnName;
             }
         }
-
-
-        /// <summary>
-        /// Constructor.
-        /// Calls the private setters to initialize the schema over the DataModel T
-        /// </summary>
-        public DataSourceSchema()
-        {
-            try
-            {
-                tryReadDataSourceAttributeValue();
-                tryReadClassDataFields();
-            }
-            catch (Exception ex)
-            {
-                throw ex.InnerException;
-            }
-        }
-
 
         /***
          * Getters.
          * They support accessing a dynamic version of this object's data
          */
+
         public string GetDataSourceName()
         {
-            return this.DataSourceName;
+            return DataSourceName;
         }
 
-
-        public GLOBALS.DataSource.Type GetDataSourceType()
+        public Globals.DataSource.Type GetDataSourceType()
         {
-            return this.DataSourceType;
+            return DataSourceType;
         }
 
-
-        public GLOBALS.DataSource.AccessMethod GetDataSourceAccessMethod()
+        public Globals.DataSource.AccessMethod GetDataSourceAccessMethod()
         {
-            return this.DataSourceAccessMethod;
+            return DataSourceAccessMethod;
         }
 
-
-        public string GetIDFieldName()
+        public string GetIdFieldName()
         {
-            return this.IDFieldName;
+            return IdFieldName;
         }
-
 
         public List<DataField> GetDataFields()
         {
-            return this.DataFields;
+            return DataFields;
         }
-
-
     }
-
 }

@@ -9,12 +9,12 @@ using System.Threading.Tasks;
 using ORM.DataAccess;
 using ORM.DataAttributes;
 
-namespace ORM.DataModels
+namespace ORM.DataModels.Examples
 {
-    [DataSource(Name = "Departments", Type = GLOBALS.DataSource.Type.DBTable, AccessMethod = GLOBALS.DataSource.AccessMethod.SingleSource)]
+    [DataSource(Name = "Departments", Type = Globals.DataSource.Type.DbTable, AccessMethod = Globals.DataSource.AccessMethod.SingleSource)]
     public class Department : DataModel
     {
-        [IsIDField]
+        [IsIdField]
         [DbColumn("ID")]
         public int ID { get; set; }
 

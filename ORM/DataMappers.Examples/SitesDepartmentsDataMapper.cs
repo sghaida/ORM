@@ -7,9 +7,9 @@ using System.Linq.Expressions;
 using ORM.Helpers;
 
 using ORM.DataAccess;
-using ORM.DataModels;
+using ORM.DataModels.Examples;
 
-namespace ORM.DataMappers
+namespace ORM.DataMappers.Examples
 {
     public class SitesDepartmentsDataMapper : DataAccess<SiteDepartment>
     {
@@ -44,16 +44,14 @@ namespace ORM.DataMappers
             List<Department> departments = null;
             List<SiteDepartment> siteDepartments = null;
 
-            Dictionary<string, object> condition = new Dictionary<string, object>();
-            condition.Add("SiteID", SiteID);
-
             try
             {
                 // This will include all the relations in SiteDepartments and fill there correspondant objects in the siteDepartments Object
-                siteDepartments = Get(whereConditions: condition, limit: 0).
-                    Include(
-                        item=>item.Department,
-                        item=>item.Site).ToList<SiteDepartment>();
+                siteDepartments = (new List<SiteDepartment>()).GetWithRelations(
+                        item => item.Department,
+                        item => item.Site)
+                    .Where(item => item.SiteID == SiteID)
+                    .ToList<SiteDepartment>();
 
                 if (siteDepartments != null && siteDepartments.Count > 0)
                 {

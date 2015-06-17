@@ -3,12 +3,12 @@
 namespace ORM.DataAttributes
 {
     /// <summary>
-    ///     This attribute tells the Repository that it's associated property resembles a Database Table ID Column.
+    ///     This attribute tells the Repository that it's associated property resembles a Database Table Foreign Key.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
-    public class IsIdFieldAttribute : Attribute
+    public class IsForeignKeyAttribute : Attribute
     {
-        public IsIdFieldAttribute(bool status = true)
+        public IsForeignKeyAttribute(bool status = true)
         {
             Status = status;
         }

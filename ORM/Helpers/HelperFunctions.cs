@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Data;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
 
@@ -15,35 +12,31 @@ namespace ORM.Helpers
 {
     public static class HelperFunctions
     {
-        public static bool GetResolvedConnecionIPAddress(string serverNameOrURL, out string resolvedIPAddress)
+        public static bool GetResolvedConnecionIpAddress(string serverNameOrUrl, out string resolvedIpAddress)
         {
-            bool isResolved = false;
-            IPHostEntry hostEntry = null;
-            IPAddress resolvIP = null;
+            var isResolved = false;
+            IPAddress resolvIp = null;
             try
             {
-                if (!IPAddress.TryParse(serverNameOrURL, out resolvIP))
+                if (!IPAddress.TryParse(serverNameOrUrl, out resolvIp))
                 {
-                    hostEntry = Dns.GetHostEntry(serverNameOrURL);
+                    var hostEntry = Dns.GetHostEntry(serverNameOrUrl);
 
                     if (hostEntry != null && hostEntry.AddressList != null
-                                 && hostEntry.AddressList.Length > 0)
+                        && hostEntry.AddressList.Length > 0)
                     {
                         if (hostEntry.AddressList.Length == 1)
                         {
-                            resolvIP = hostEntry.AddressList[0];
+                            resolvIp = hostEntry.AddressList[0];
                             isResolved = true;
                         }
                         else
                         {
-                            foreach (IPAddress var in hostEntry.AddressList)
+                            foreach (var var in hostEntry.AddressList.Where(var => var.AddressFamily == AddressFamily.InterNetwork))
                             {
-                                if (var.AddressFamily == AddressFamily.InterNetwork)
-                                {
-                                    resolvIP = var;
-                                    isResolved = true;
-                                    break;
-                                }
+                                resolvIp = var;
+                                isResolved = true;
+                                break;
                             }
                         }
                     }
@@ -53,25 +46,25 @@ namespace ORM.Helpers
                     isResolved = true;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 isResolved = false;
-                resolvIP = null;
+                resolvIp = null;
             }
             finally
             {
-                resolvedIPAddress = resolvIP.ToString();
+                if (resolvIp != null) resolvedIpAddress = resolvIp.ToString();
             }
 
+            resolvedIpAddress = null;
             return isResolved;
         }
-
 
         public static string SerializeObject<T>(T source)
         {
             var serializer = new XmlSerializer(typeof(T));
 
-            using (var sw = new System.IO.StringWriter())
+            using (var sw = new StringWriter())
             using (var writer = new XmlTextWriter(sw))
             {
                 serializer.Serialize(writer, source);
@@ -81,91 +74,82 @@ namespace ORM.Helpers
 
         public static T DeSerializeObject<T>(string xml)
         {
-            using (System.IO.StringReader sr = new System.IO.StringReader(xml))
+            using (var sr = new StringReader(xml))
             {
-                XmlSerializer serializer = new XmlSerializer(typeof(T));
+                var serializer = new XmlSerializer(typeof(T));
                 return (T)serializer.Deserialize(sr);
             }
         }
 
         public static object ReturnZeroIfNull(this object value)
         {
-            if (value == System.DBNull.Value)
+            if (value == DBNull.Value)
                 return 0;
-            else if (value == null)
+            if (value == null)
                 return 0;
-            else
-                return value;
+            return value;
         }
 
         public static object ReturnEmptyIfNull(this object value)
         {
-            if (value == System.DBNull.Value)
+            if (value == DBNull.Value)
                 return string.Empty;
-            else if (value == null)
+            if (value == null)
                 return string.Empty;
-            else
-                return value;
+            return value;
         }
 
         public static object ReturnFalseIfNull(this object value)
         {
-            if (value == System.DBNull.Value)
+            if (value == DBNull.Value)
                 return false;
-            else if (value == null)
+            if (value == null)
                 return false;
-            else
-                return value;
+            return value;
         }
 
         public static object ReturnDateTimeMinIfNull(this object value)
         {
-            if (value == System.DBNull.Value)
+            if (value == DBNull.Value)
                 return DateTime.MinValue;
-            else if (value == null)
+            if (value == null)
                 return DateTime.MinValue;
-            else
-                return value;
+            return value;
         }
 
-        public static object ReturnNullIfDBNull(this object value)
+        public static object ReturnNullIfDbNull(this object value)
         {
-            if (value == System.DBNull.Value)
+            if (value == DBNull.Value)
                 return '\0';
-            else if (value == null)
+            if (value == null)
                 return '\0';
-            else
-                return value;
+            return value;
         }
 
         //This function formats the display-name of a user,
         //and removes unnecessary extra information.
-        public static string FormatUserDisplayName(string displayName = null, string defaultValue = "tBill Users", bool returnNameIfExists = false, bool returnAddressPartIfExists = false)
+        public static string FormatUserDisplayName(string displayName = null, string defaultValue = "tBill Users",
+            bool returnNameIfExists = false, bool returnAddressPartIfExists = false)
         {
             //Get the first part of the Users's Display Name if s/he has a name like this: "firstname lastname (extra text)"
             //removes the "(extra text)" part
             if (!string.IsNullOrEmpty(displayName))
             {
-                if (returnNameIfExists == true)
+                if (returnNameIfExists)
                     return Regex.Replace(displayName, @"\ \(\w{1,}\)", "");
-                else
-                    return (displayName.Split(' '))[0];
+                return (displayName.Split(' '))[0];
             }
-            else
+            if (returnAddressPartIfExists)
             {
-                if (returnAddressPartIfExists == true)
-                {
-                    var emailParts = defaultValue.Split('@');
-                    return emailParts[0];
-                }
-                else
-                    return defaultValue;
+                var emailParts = defaultValue.Split('@');
+                return emailParts[0];
             }
+            return defaultValue;
         }
 
         public static string FormatUserTelephoneNumber(this string telephoneNumber)
         {
-            string result = string.Empty;
+            var result = string.Empty;
 
             if (!string.IsNullOrEmpty(telephoneNumber))
             {
@@ -175,7 +159,7 @@ namespace ORM.Helpers
                 if (result.Contains(";"))
                 {
                     if (!result.ToLower().Contains(";ext="))
-                        result = result.Split(';')[0].ToString();
+                        result = result.Split(';')[0];
                 }
             }
 
@@ -184,77 +168,82 @@ namespace ORM.Helpers
 
         public static bool IsValidEmail(this string emailAddress)
         {
-            string pattern = @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z";
+            const string pattern = @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z";
 
             return Regex.IsMatch(emailAddress, pattern);
         }
 
+        /// <summary>
+        /// Convert DateTime to string
+        /// </summary>
+        /// <param name="datetTime"></param>
+        /// <param name="excludeHoursAndMinutes">if true it will execlude time from datetime string. Default is false</param>
+        /// <returns></returns>
         public static string ConvertDate(this DateTime datetTime, bool excludeHoursAndMinutes = false)
         {
-            if (datetTime != DateTime.MinValue || datetTime != null)
+            if (datetTime != DateTime.MinValue)
             {
-                if (excludeHoursAndMinutes == true)
+                if (excludeHoursAndMinutes)
                     return datetTime.ToString("yyyy-MM-dd");
-                else
-                    return datetTime.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                return datetTime.ToString("yyyy-MM-dd HH:mm:ss.fff");
             }
-            else
-                return null;
+            return null;
         }
 
+        [SuppressMessage("ReSharper", "PossibleLossOfFraction")]
         public static string ConvertSecondsToReadable(this int secondsParam)
         {
-            int hours = Convert.ToInt32(Math.Floor((double)(secondsParam / 3600)));
-            int minutes = Convert.ToInt32(Math.Floor((double)(secondsParam - (hours * 3600)) / 60));
-            int seconds = secondsParam - (hours * 3600) - (minutes * 60);
+            var hours = Convert.ToInt32(Math.Floor((double)(secondsParam / 3600)));
+            var minutes = Convert.ToInt32(Math.Floor((double)(secondsParam - (hours * 3600)) / 60));
+            var seconds = secondsParam - (hours * 3600) - (minutes * 60);
 
-            string hours_str = hours.ToString();
-            string mins_str = minutes.ToString();
-            string secs_str = seconds.ToString();
+            var hoursStr = hours.ToString();
+            var minsStr = minutes.ToString();
+            var secsStr = seconds.ToString();
 
             if (hours < 10)
             {
-                hours_str = "0" + hours_str;
+                hoursStr = "0" + hoursStr;
             }
 
             if (minutes < 10)
             {
-                mins_str = "0" + mins_str;
+                minsStr = "0" + minsStr;
             }
             if (seconds < 10)
             {
-                secs_str = "0" + secs_str;
+                secsStr = "0" + secsStr;
             }
 
-            return hours_str + ':' + mins_str + ':' + secs_str;
+            return hoursStr + ':' + minsStr + ':' + secsStr;
         }
 
-
+        [SuppressMessage("ReSharper", "PossibleLossOfFraction")]
         public static string ConvertSecondsToReadable(this long secondsParam)
         {
-            int hours = Convert.ToInt32(Math.Floor((double)(secondsParam / 3600)));
-            int minutes = Convert.ToInt32(Math.Floor((double)(secondsParam - (hours * 3600)) / 60));
-            int seconds = Convert.ToInt32(secondsParam - (hours * 3600) - (minutes * 60));
+            var hours = Convert.ToInt32(Math.Floor((double)(secondsParam / 3600)));
+            var minutes = Convert.ToInt32(Math.Floor((double)(secondsParam - (hours * 3600)) / 60));
+            var seconds = Convert.ToInt32(secondsParam - (hours * 3600) - (minutes * 60));
 
-            string hours_str = hours.ToString();
-            string mins_str = minutes.ToString();
-            string secs_str = seconds.ToString();
+            var hoursStr = hours.ToString();
+            var minsStr = minutes.ToString();
+            var secsStr = seconds.ToString();
 
             if (hours < 10)
             {
-                hours_str = "0" + hours_str;
+                hoursStr = "0" + hoursStr;
             }
 
             if (minutes < 10)
             {
-                mins_str = "0" + mins_str;
+                minsStr = "0" + minsStr;
             }
             if (seconds < 10)
             {
-                secs_str = "0" + secs_str;
+                secsStr = "0" + secsStr;
             }
 
-            return hours_str + ':' + mins_str + ':' + secs_str;
+            return hoursStr + ':' + minsStr + ':' + secsStr;
         }
     }
 }

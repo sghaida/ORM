@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Linq;
 
 namespace ORM.Helpers
 {
@@ -10,12 +6,7 @@ namespace ORM.Helpers
     {
         public static bool In<T>(this T x, params T[] values)
         {
-            foreach (T value in values)
-            {
-                if (x.Equals(value))
-                    return true;
-            }
-            return false;
+            return values.Contains(x);
         }
     }
 }

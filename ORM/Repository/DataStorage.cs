@@ -7,9 +7,7 @@ using System.Threading;
 
 using ORM.Helpers;
 using ORM.DataAccess;
-using ORM.DataMappers;
-//using ORM.DataModels;
-//using ORM.DataMappers;
+using ORM.DataMappers.Examples;
 
 
 namespace ORM.Repository
@@ -20,10 +18,11 @@ namespace ORM.Repository
          * DataStorage Repositories
          */
 
-        /*Example of Instantiating DataMappers inside DB Storage*/
+        /* Example of Instantiating DataMappers inside DB Storage */
         public SitesDepartmentsDataMapper Sites = new SitesDepartmentsDataMapper();
         public DepartmentsDataMapper Departments = new DepartmentsDataMapper();
         public SitesDepartmentsDataMapper SitesDepartments = new SitesDepartmentsDataMapper();
+
 
 
         /***
@@ -46,7 +45,7 @@ namespace ORM.Repository
             {
                 if (_instance == null)
                 {
-                    lock(_mutex)
+                    lock (_mutex)
                     {
                         if (_instance == null)
                         {
