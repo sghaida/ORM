@@ -16,6 +16,10 @@ It started out as a research project to replace the need for the enourmously hea
  * C# 4.5
  * .NET Framework 4.5
 
-
 #### GETTING STARTED
  To get started and learn more on how to use the project, can visit the [github pages of this project](http://software-repos.github.io/ORM/)
+
+
+
+**[LICENSE](LICENSE)**
+ 
