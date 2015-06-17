@@ -1,7 +1,6 @@
 # C# ORM
 
-ORM is a C#.NET class-library project. ORM stands for Object-Relational-Mapping.
-
+A class-library project that implements a simple, light-weight, object-relational-mapper in C#.
 
 #### DESCRIPTION:
 
