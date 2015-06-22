@@ -6,7 +6,7 @@ It started out as a research project to replace the need for the enourmously hea
 
 #### GETTING STARTED
 
- To get started and learn more on how to use the project, can visit the [github pages of this project](http://software-repos.github.io/ORM/)
+ To get started and learn more on how to use the project, can visit the [github pages of this project](http://rnd-projects.github.io/ORM/)
 
 #### TECHNOLOGIES
 
