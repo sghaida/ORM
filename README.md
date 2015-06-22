@@ -18,6 +18,7 @@ It started out as a research project to replace the need for the enourmously hea
  * [Saddam Abu Ghaida](http://github.com/sghaida)
  * [Ahmad Alhour](http://github.com/aalhour)
 
+#### LICENSE
 
-**[LICENSE](LICENSE)**
+This project is licensed under the [MIT License](LICENSE)
  
